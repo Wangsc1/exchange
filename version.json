@@ -1,5 +1,5 @@
 {
-  "version": "1.0.9",
-  "notes": "删除详情页行情点统计文字；全界面改用 DIN 风格内嵌字体。",
+  "version": "1.0.10",
+  "notes": "切换货币对勾夜间白色、日间黑色；滑动可滑到底；页面进入与返回加入回弹动画。",
   "files": ["index.tsx", "core.ts", "service.ts", "update.ts", "web/index.html", "web/style.css", "web/ui.js", "web/core.js"]
 }

@@ -19,7 +19,13 @@ function bridge(action, value) {
   });
 }
 function toast(message) { $('toast').textContent = message; $('toast').classList.remove('hidden'); clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').classList.add('hidden'), 5500); }
-function show(target) { page = target; for (const id of ['home', 'detail', 'selector', 'menu']) $(id).classList.toggle('hidden', id !== target); }
+const entryDir = {};
+function show(target, dir = 'right') {
+  const leaving = page;
+  if (dir === 'back') dir = entryDir[leaving] === 'right' ? 'left' : 'right'; else entryDir[target] = dir;
+  page = target; for (const id of ['home', 'detail', 'selector', 'menu']) $(id).classList.toggle('hidden', id !== target);
+  const el = $(target); el.classList.remove('enterLeft', 'enterRight'); void el.offsetWidth; el.classList.add(dir === 'left' ? 'enterLeft' : 'enterRight');
+}
 function numberText(n) { return n.toLocaleString('en-US', { useGrouping: false, maximumSignificantDigits: 15 }); }
 function formatted(n) { return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: Math.abs(n) < 0.01 && n !== 0 ? 6 : 2 }); }
 function persist() {
@@ -43,30 +49,36 @@ function renderRows() {
     amounts.append(element('div', code === config.base ? expr : amount === null ? '—' : formatted(amount), 'amount'), element('div', `${c.name} ${c.symbol}`, 'name'));
     content.append(amounts); content.setAttribute('aria-label', `${c.name} ${amount === null ? '暂无数据' : numberText(amount)}，点击作为输入基准；左右滑动打开操作`);
     let startX = 0, startY = 0, startOffset = 0, offset = 0, moving = false, dragged = false;
+    // 内容跟手位移；左右操作面板宽度等于已露出的宽度，因此可一直滑到底。animate=true 时使用回弹曲线。
+    const setOffset = (o, animate) => {
+      const t = animate ? '' : 'none';
+      content.style.transition = t; swap.style.transition = t; info.style.transition = t;
+      content.style.transform = o ? `translateX(${o}px)` : ''; swap.style.width = o > 0 ? o + 'px' : ''; info.style.width = o < 0 ? -o + 'px' : '';
+    };
     content.onpointerdown = event => { startX = event.clientX; startY = event.clientY; startOffset = offset; moving = false; dragged = false; };
     content.onpointermove = event => {
       const dx = event.clientX - startX, dy = event.clientY - startY;
       if (!moving && Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) { moving = true; dragged = true; content.setPointerCapture(event.pointerId); }
       if (!moving) return;
-      event.preventDefault(); offset = Math.max(-row.clientWidth / 2, Math.min(row.clientWidth / 2, startOffset + dx));
-      content.style.transition = 'none'; content.style.transform = `translateX(${offset}px)`;
+      event.preventDefault(); const w = row.clientWidth; offset = Math.max(-w, Math.min(w, startOffset + dx));
+      setOffset(offset, false);
     };
     content.onpointerup = () => {
       if (moving) {
-        const max = row.clientWidth / 2;
-        if (Math.abs(offset) >= max * 0.9) {
-          // 滑到底：松手后自动打开对应页面，并让行恢复原位。
-          const action = offset > 0 ? () => openSelector({ kind: 'row', index, back: 'home' }) : () => openDetail(code);
-          offset = 0; content.style.transition = ''; content.style.transform = ''; moving = false; action(); return;
+        const w = row.clientWidth;
+        if (Math.abs(offset) >= w * 0.8) {
+          // 滑到底：先停在底部，页面以回弹动画进入；行随后弹回原位。
+          const action = offset > 0 ? () => openSelector({ kind: 'row', index, back: 'home' }, 'left') : () => openDetail(code);
+          offset = 0; moving = false; action(); setOffset(0, true); return;
         }
-        offset = Math.abs(offset) > 45 ? Math.sign(offset) * max : 0; content.style.transition = ''; content.style.transform = `translateX(${offset}px)`;
+        offset = Math.abs(offset) > 45 ? Math.sign(offset) * (w / 2) : 0; setOffset(offset, true);
       }
       moving = false;
     };
-    content.onpointercancel = () => { moving = false; offset = 0; content.style.transition = ''; content.style.transform = ''; };
+    content.onpointercancel = () => { moving = false; offset = 0; setOffset(0, true); };
     content.onclick = () => {
       if (dragged) { dragged = false; return; }
-      if (offset) { offset = 0; content.style.transform = ''; return; }
+      if (offset) { offset = 0; setOffset(0, true); return; }
       if (!snapshot) return toast('请先刷新取得汇率');
       try { config = { ...config, base: code, amount: 100 }; expr = '100'; fresh = true; persist(); render(); } catch (e) { toast(e.message); }
     };
@@ -93,7 +105,7 @@ function input(key) {
 ['7','8','9','+','4','5','6','-','1','2','3','×','.','0','⌫','÷'].forEach(key => { const b = element('button', key); b.setAttribute('aria-label', key === '⌫' ? '退格' : key); b.onclick = () => input(key); $('keyboard').append(b); });
 $('clear').onclick = () => { input('AC'); fresh = true; }; $('equals').onclick = () => input('='); $('refresh').onclick = refresh;
 function available() { return snapshot ? Object.keys(snapshot.rates) : []; }
-function openSelector(value) { if (!snapshot) return toast('请先取得可用币种汇率'); selection = value; $('selectTitle').textContent = value.kind === 'row' ? '切换货币' : value.kind === 'base' ? '选择基准币种' : '选择目标币种'; $('search').value = ''; show('selector'); renderSelector(); }
+function openSelector(value, dir = 'right') { if (!snapshot) return toast('请先取得可用币种汇率'); selection = value; $('selectTitle').textContent = value.kind === 'row' ? '切换货币' : value.kind === 'base' ? '选择基准币种' : '选择目标币种'; $('search').value = ''; show('selector', dir); renderSelector(); }
 function selectedCode() { return selection.kind === 'row' ? config.codes[selection.index] : selection.kind === 'base' ? detailBase : detailQuote; }
 // 中文名称首字拼音首字母（固定表，避免依赖系统拼音排序）。
 const INITIAL = { USD:'M',CNY:'R',CAD:'J',EUR:'O',GBP:'Y',AUD:'A',BRL:'B',CHF:'R',CZK:'J',DKK:'D',HKD:'G',HUF:'X',IDR:'Y',ILS:'Y',INR:'Y',ISK:'B',JPY:'R',KRW:'H',MXN:'M',MYR:'M',NOK:'N',NZD:'X',PHP:'F',PLN:'B',RON:'L',SEK:'R',SGD:'X',THB:'T',TRY:'T',ZAR:'N' };
@@ -142,7 +154,7 @@ function renderSelector() {
           if (selection.kind === 'row') { config = Core.replaceCurrency(config, selection.index, c.code, snapshot); expr = numberText(config.amount); fresh = true; persist(); render(); }
           else if (selection.kind === 'base') { detailAmount = 100; detailBase = c.code; }
           else detailQuote = c.code;
-          show(selection.back); if (selection.back === 'detail') renderDetail();
+          show(selection.back, 'back'); if (selection.back === 'detail') renderDetail();
         } catch (e) { toast(e.message); }
       };
       $('currencyList').append(b);
@@ -151,11 +163,11 @@ function renderSelector() {
   if (!found.length) $('currencyList').append(element('p', '没有匹配的可用法币', 'muted'));
 }
 $('search').oninput = renderSelector;
-function dismissSelector() { $('letterIndex').classList.add('hidden'); $('letterBubble').classList.add('hidden'); show(selection?.back || 'home'); }
+function dismissSelector() { $('letterIndex').classList.add('hidden'); $('letterBubble').classList.add('hidden'); show(selection?.back || 'home', 'back'); }
 $('selectorBack').onclick = dismissSelector;
 function openDetail(code) {
   if (!snapshot) return toast('请先取得汇率');
-  try { detailBase = code; detailAmount = 100; detailQuote = code === 'USD' ? 'CNY' : 'USD'; show('detail'); renderDetail(); } catch (e) { toast(e.message); }
+  try { detailBase = code; detailAmount = 100; detailQuote = code === 'USD' ? 'CNY' : 'USD'; show('detail', 'right'); renderDetail(); } catch (e) { toast(e.message); }
 }
 function renderDetail() {
   const base = currency(detailBase), quote = currency(detailQuote); $('pair').replaceChildren();
@@ -197,8 +209,8 @@ function chart(records,stats) {
   else $('chart').append(svg('circle',{cx:points[0][0],cy:points[0][1],r:'3',fill:'#ef2c73'}));
   const title=svg('title',{});title.textContent=`${records[0].base}兑${records[0].quote}，${records[0].date}至${records[records.length-1].date}，最低${stats.low}，最高${stats.high}`;$('chart').prepend(title);
 }
-$('detailBack').onclick = () => { historyToken++; show('home'); };
-$('settings').onclick = () => { show('menu'); $('version').textContent = Core.VERSION; }; $('menuBack').onclick = () => show('home');
+$('detailBack').onclick = () => { historyToken++; show('home', 'back'); };
+$('settings').onclick = () => { show('menu', 'right'); $('version').textContent = Core.VERSION; }; $('menuBack').onclick = () => show('home', 'back');
 $('close').onclick = async () => { await saveQueue; try {await bridge('close');}catch(e){toast(e.message);} };
 $('checkUpdate').onclick = async () => {
   $('checkUpdate').disabled=true; $('install').classList.add('hidden'); $('updateStatus').textContent='正在检查公开仓库…';
