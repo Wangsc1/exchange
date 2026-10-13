@@ -1,0 +1,7 @@
+# 不提交电脑依赖、临时构建、日志或系统文件。
+node_modules/
+.DS_Store
+*.log
+*.zip
+coverage/
+.scripting/
