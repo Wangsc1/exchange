@@ -23,7 +23,7 @@ const entryDir = {};
 function show(target, dir = 'right') {
   const leaving = page;
   if (dir === 'back') dir = entryDir[leaving] === 'right' ? 'left' : 'right'; else entryDir[target] = dir;
-  page = target; for (const id of ['home', 'detail', 'selector', 'menu']) $(id).classList.toggle('hidden', id !== target);
+  page = target; for (const id of ['home', 'detail', 'selector']) $(id).classList.toggle('hidden', id !== target);
   const el = $(target); el.classList.remove('enterLeft', 'enterRight'); void el.offsetWidth; el.classList.add(dir === 'left' ? 'enterLeft' : 'enterRight');
 }
 function numberText(n) { return n.toLocaleString('en-US', { useGrouping: false, maximumSignificantDigits: 15 }); }
@@ -210,21 +210,6 @@ function chart(records,stats) {
   const title=svg('title',{});title.textContent=`${records[0].base}兑${records[0].quote}，${records[0].date}至${records[records.length-1].date}，最低${stats.low}，最高${stats.high}`;$('chart').prepend(title);
 }
 $('detailBack').onclick = () => { historyToken++; show('home', 'back'); };
-$('settings').onclick = () => { show('menu', 'right'); $('version').textContent = Core.VERSION; }; $('menuBack').onclick = () => show('home', 'back');
-$('close').onclick = async () => { await saveQueue; try {await bridge('close');}catch(e){toast(e.message);} };
-$('checkUpdate').onclick = async () => {
-  $('checkUpdate').disabled=true; $('install').classList.add('hidden'); $('updateStatus').textContent='正在检查公开仓库…';
-  try {const r=await bridge('checkUpdate');$('version').textContent=r.current;$('updateStatus').textContent=r.available?`发现 ${r.manifest.version}：${r.manifest.notes}`:`已是最新版 ${r.current}`;$('install').classList.toggle('hidden',!r.available);}
-  catch(e){$('updateStatus').textContent=`检查失败：${e.message}。仓库尚未发布程序时也会出现此提示。`;}
-  finally{$('checkUpdate').disabled=false;}
-};
-$('install').onclick = async () => {
-  if(!window.confirm('只更新程序文件，保留手机 script.json 与本地配置。更新完成后需重新运行。是否继续？'))return;
-  $('install').disabled=true; $('checkUpdate').disabled=true; $('updateStatus').textContent='正在下载并备份程序，请勿关闭…';
-  try{await saveQueue;const r=await bridge('update');$('updateStatus').textContent=`已更新至 ${r.version}，请关闭并重新运行。`; $('install').classList.add('hidden');}
-  catch(e){$('updateStatus').textContent=e.message;}
-  finally{$('install').disabled=false;$('checkUpdate').disabled=false;}
-};
 async function start(){render();try{config=Core.normalizeConfig(await bridge('config'));expr=numberText(config.amount);render();}catch(e){toast(e.message);}await refresh();}
 start();
 // 每次进入都自动刷新：启动时一次；App 从后台回到前台时再刷新（距上次成功刷新超过 20 秒，避免频繁请求）。
@@ -234,7 +219,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 // 子页面支持从屏幕左边缘向右滑返回；命中区为左边缘 28px，水平位移超过 70px 且大于竖向位移时触发。
 {
   let sx = 0, sy = 0, tracking = false;
-  const back = () => { if (page === 'detail') $('detailBack').click(); else if (page === 'selector') $('selectorBack').click(); else if (page === 'menu') $('menuBack').click(); };
+  const back = () => { if (page === 'detail') $('detailBack').click(); else if (page === 'selector') $('selectorBack').click(); };
   document.addEventListener('touchstart', e => { const t = e.touches[0]; tracking = page !== 'home' && e.touches.length === 1 && t.clientX <= 28; sx = t.clientX; sy = t.clientY; }, { passive: true });
   document.addEventListener('touchend', e => { if (!tracking) return; tracking = false; const t = e.changedTouches[0], dx = t.clientX - sx, dy = Math.abs(t.clientY - sy); if (dx > 70 && dx > dy * 1.5) back(); }, { passive: true });
   document.addEventListener('touchcancel', () => { tracking = false; }, { passive: true });

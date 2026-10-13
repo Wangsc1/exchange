@@ -2,7 +2,7 @@
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="color-scheme" content="dark light"><title>汇率</title><style>/* 样式入口 */</style></head>
 <body>
 <main id="home" class="page">
-  <header><h1>汇率</h1><div><button id="settings" aria-label="设置"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button></div></header>
+  <header><h1>汇率</h1></header>
   <section id="rows" aria-label="货币列表"></section>
   <div id="source" role="status">正在加载 ECB 参考汇率…</div>
   <div class="expression"><span id="expression">100 CNY</span><button id="clear">AC</button><button id="equals">=</button></div>
@@ -20,10 +20,6 @@
 <section id="selector" class="page hidden">
   <header><button id="selectorBack">‹ 返回</button><h1 id="selectTitle">切换货币</h1><span class="headerSpacer" aria-hidden="true"></span></header>
   <input id="search" type="search" placeholder="搜索中文 / 代码 / 国家地区" aria-label="搜索货币" autocomplete="off"><div id="currencyList"></div><div id="letterIndex" class="hidden" aria-label="拼音首字母快速定位"></div><div id="letterBubble" class="hidden"></div>
-</section>
-<section id="menu" class="page hidden">
-  <header><button id="menuBack">‹ 返回</button><h1>设置</h1><button id="close">关闭</button></header>
-  <div class="settingsContent"><p>汇率 <span id="version"></span></p><p class="muted">法币参考汇率 · ECB 工作日更新<br>程序更新保留币种及金额，不覆盖手机 script.json。</p><button id="checkUpdate" class="wide">在线检查更新</button><p id="updateStatus" role="status"></p><button id="install" class="wide hidden">确认更新程序</button><p class="muted">来源：Wangsc1/exchange（公开仓库）<br>更新后需关闭并重新运行；不会自动安装。</p></div>
 </section>
 <div id="toast" class="hidden" role="alert"></div>
 <script>/* 业务入口 */</script><script>/* 界面入口 */</script>
