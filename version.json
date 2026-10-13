@@ -1,5 +1,5 @@
 {
-  "version": "1.0.1",
-  "notes": "修复手机端“原生操作失败”：改为原生主动回传结果；取数失败时显示具体原因。",
+  "version": "1.0.3",
+  "notes": "修复保存配置误报；键盘底部同色；右上角刷新和设置图标统一大小。",
   "files": ["index.tsx", "core.ts", "service.ts", "update.ts", "web/index.html", "web/style.css", "web/ui.js", "web/core.js"]
 }

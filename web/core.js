@@ -166,7 +166,7 @@ async function cached(store, key, load, validate) {
         }
     }
 }
-exports.VERSION = '1.0.1';
+exports.VERSION = '1.0.3';
 function newer(remote, local) { if (!/^\d+\.\d+\.\d+$/.test(remote) || !/^\d+\.\d+\.\d+$/.test(local))
     throw new Error('版本格式无效'); const a = remote.split('.').map(Number), b = local.split('.').map(Number); for (let i = 0; i < 3; i++) {
     if (a[i] !== b[i])

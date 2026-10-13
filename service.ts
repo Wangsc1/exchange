@@ -6,7 +6,7 @@ const REMOTE='https://raw.githubusercontent.com/Wangsc1/exchange/main/'
 const store:Core.CacheStore={get:key=>Storage.get(key),set:(key,value)=>Storage.set(key,value)}
 async function json(url:string):Promise<unknown>{const r=await fetch(url,{timeout:20});if(!r.ok)throw new Error(`请求失败 HTTP ${r.status}`);return await r.json()}
 export function readConfig(){return Core.normalizeConfig(Storage.get('config.v1'))}
-export function saveConfig(value:unknown){const c=Core.normalizeConfig(value);if(JSON.stringify(c)!==JSON.stringify(value))throw new Error('配置格式不正确');if(!Storage.set('config.v1',c))throw new Error('配置保存失败');return c}
+export function saveConfig(value:unknown){const c=Core.normalizeConfig(value);const v=value as Core.Config;if(!v||!Array.isArray(v.codes)||v.codes.length!==c.codes.length||v.codes.some((x,i)=>x!==c.codes[i])||v.base!==c.base||v.amount!==c.amount)throw new Error('配置格式不正确');if(!Storage.set('config.v1',c))throw new Error('配置保存失败');return c}
 export async function latest(){return Core.cached(store,'rates.ecb.v2',async()=>Core.parseLatest(await json(API+'/rates?providers=ECB&base=EUR')),Core.validateSnapshot)}
 export async function history(params:{base:string;quote:string;days:number;end:string}){
   const {base,quote,days,end}=params
