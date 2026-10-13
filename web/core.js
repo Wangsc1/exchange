@@ -19,6 +19,9 @@ exports.parseHistory = parseHistory;
 exports.statistics = statistics;
 exports.cached = cached;
 exports.newer = newer;
+exports.parseYahoo = parseYahoo;
+exports.crossIntraday = crossIntraday;
+exports.validateIntraday = validateIntraday;
 exports.DEFAULT_CODES = ['USD', 'CNY', 'CAD', 'EUR', 'GBP', 'AUD'];
 // 当前 ECB 常规发布的法币；没有行情的币种不会出现在选择列表中。
 exports.CURRENCIES = [
@@ -130,8 +133,8 @@ function keyInput(text, key) {
         return text + (tail ? '' : '0') + '.';
     return text === '0' ? key : text + key;
 }
-exports.PERIODS = [{ label: '7天', days: 7 }, { label: '1月', days: 30 }, { label: '6月', days: 183 }, { label: '1年', days: 365 }, { label: '3年', days: 1095 }];
-function historyRange(end, days) { if (!validDate(end) || !exports.PERIODS.some(p => p.days === days))
+exports.PERIODS = [{ label: '24时', days: 1, intraday: true }, { label: '7天', days: 7, intraday: true }, { label: '1月', days: 30 }, { label: '6月', days: 183 }, { label: '1年', days: 365 }, { label: '3年', days: 1095 }];
+function historyRange(end, days) { if (!validDate(end) || !exports.PERIODS.some(p => p.days === days && !p.intraday))
     throw new Error('历史周期无效'); const d = new Date(end + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() - days + 1); return { from: d.toISOString().slice(0, 10), to: end }; }
 function parseHistory(data, base, quote, from, to) {
     if (!Array.isArray(data) || !data.length)
@@ -166,11 +169,51 @@ async function cached(store, key, load, validate) {
         }
     }
 }
-exports.VERSION = '1.0.7';
+exports.VERSION = '1.0.8';
 function newer(remote, local) { if (!/^\d+\.\d+\.\d+$/.test(remote) || !/^\d+\.\d+\.\d+$/.test(local))
     throw new Error('版本格式无效'); const a = remote.split('.').map(Number), b = local.split('.').map(Number); for (let i = 0; i < 3; i++) {
     if (a[i] !== b[i])
         return a[i] > b[i];
 } return false; }
+function parseYahoo(data) {
+    const r = data?.chart?.result?.[0];
+    const ts = r?.timestamp, close = r?.indicators?.quote?.[0]?.close;
+    if (!Array.isArray(ts) || !Array.isArray(close) || ts.length !== close.length)
+        throw new Error('日内行情数据格式异常');
+    const out = [];
+    ts.forEach((t, i) => { const v = close[i]; if (Number.isFinite(t) && typeof v === 'number' && Number.isFinite(v) && v > 0)
+        out.push({ t: t * 1000, v }); });
+    if (out.length < 2)
+        throw new Error('日内行情数据不足');
+    return out.sort((a, b) => a.t - b.t);
+}
+// base/quote 均为“1 美元兑该币种”的序列（null 代表 USD=1）；返回 1 base 兑 quote，并截取最后 hours 小时。
+function crossIntraday(base, quote, a, b, hours) {
+    const A = a || [], B = b || [];
+    const times = [...new Set([...A.map(p => p.t), ...B.map(p => p.t)])].sort((x, y) => x - y);
+    let i = 0, j = 0, va = a ? 0 : 1, vb = b ? 0 : 1;
+    const all = [];
+    for (const t of times) {
+        while (i < A.length && A[i].t <= t)
+            va = A[i++].v;
+        while (j < B.length && B[j].t <= t)
+            vb = B[j++].v;
+        if (va > 0 && vb > 0)
+            all.push({ date: new Date(t).toISOString(), base, quote, rate: vb / va });
+    }
+    if (all.length < 2)
+        throw new Error('日内行情数据不足');
+    const end = Date.parse(all[all.length - 1].date), from = end - hours * 3600000;
+    const cut = all.filter(r => Date.parse(r.date) >= from);
+    if (cut.length < 2)
+        throw new Error('日内行情数据不足');
+    return cut;
+}
+function validateIntraday(value, base, quote) {
+    if (!Array.isArray(value) || value.length < 2)
+        throw new Error('日内缓存损坏');
+    return value.map(r => { if (!r || r.base !== base || r.quote !== quote || !Number.isFinite(Date.parse(r.date)) || !Number.isFinite(r.rate) || r.rate <= 0)
+        throw new Error('日内缓存损坏'); return { date: r.date, base, quote, rate: r.rate }; });
+}
 
 return exports; })();

@@ -3,7 +3,7 @@
 const $ = id => document.getElementById(id);
 let config = Core.normalizeConfig(null), snapshot = null, expr = '100', fresh = true;
 let offline = false, warning = '', busy = false, page = 'home', toastTimer, saveQueue = Promise.resolve();
-let selection = null, detailBase = 'CNY', detailQuote = 'USD', detailAmount = 100, period = 30, historyToken = 0;
+let selection = null, detailBase = 'CNY', detailQuote = 'USD', detailAmount = 100, period = 1, historyToken = 0;
 // 原生处理函数不依赖 postMessage 返回值：原生完成后主动调用 window.__exchangeReply 回传结果。
 const pending = new Map(); let seq = 0;
 window.__exchangeReply = (reply) => { const item = pending.get(reply && reply.id); if (!item) return; pending.delete(reply.id); clearTimeout(item.timer); reply.ok ? item.resolve(reply.value) : item.reject(new Error(reply.error || '原生操作失败')); };
@@ -140,7 +140,7 @@ function renderSelector() {
       b.onclick = () => {
         try {
           if (selection.kind === 'row') { config = Core.replaceCurrency(config, selection.index, c.code, snapshot); expr = numberText(config.amount); fresh = true; persist(); render(); }
-          else if (selection.kind === 'base') { detailAmount = Core.convert(detailAmount, detailBase, c.code, snapshot); detailBase = c.code; }
+          else if (selection.kind === 'base') { detailAmount = 100; detailBase = c.code; }
           else detailQuote = c.code;
           show(selection.back); if (selection.back === 'detail') renderDetail();
         } catch (e) { toast(e.message); }
@@ -155,7 +155,7 @@ function dismissSelector() { $('letterIndex').classList.add('hidden'); $('letter
 $('selectorBack').onclick = dismissSelector;
 function openDetail(code) {
   if (!snapshot) return toast('请先取得汇率');
-  try { detailBase = code; detailAmount = Core.convert(config.amount, config.base, code, snapshot); detailQuote = code === 'USD' ? 'CNY' : 'USD'; show('detail'); renderDetail(); } catch (e) { toast(e.message); }
+  try { detailBase = code; detailAmount = 100; detailQuote = code === 'USD' ? 'CNY' : 'USD'; show('detail'); renderDetail(); } catch (e) { toast(e.message); }
 }
 function renderDetail() {
   const base = currency(detailBase), quote = currency(detailQuote); $('pair').replaceChildren();
@@ -163,22 +163,28 @@ function renderDetail() {
   b.onclick = () => openSelector({kind:'base',back:'detail'}); q.onclick = () => openSelector({kind:'quote',back:'detail'});
   $('pair').append(b, element('span',' → '), q);
   $('bigAmount').textContent = formatted(Core.convert(detailAmount, detailBase, detailQuote, snapshot));
-  $('unitRate').textContent = `1 ${detailBase} = ${numberText(Core.convert(1,detailBase,detailQuote,snapshot))} ${detailQuote} · ${snapshot.date}`;
   $('periods').replaceChildren();
   Core.PERIODS.forEach(p => { const button = element('button',p.label,p.days === period ? 'active' : ''); button.onclick = () => { period = p.days; renderDetail(); }; $('periods').append(button); });
   loadHistory();
 }
+function timeLabel(date) { if (date.length <= 10) return date; const d = new Date(date), p = n => String(n).padStart(2, '0'); return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
 async function loadHistory() {
-  const token = ++historyToken, base = detailBase, quote = detailQuote;
-  $('chart').replaceChildren(); $('stats').replaceChildren(); $('chartDates').replaceChildren(); $('historyStatus').textContent = '正在读取真实日历史…';
+  const token = ++historyToken, base = detailBase, quote = detailQuote, selected = Core.PERIODS.find(p => p.days === period);
+  $('chart').replaceChildren(); $('stats').replaceChildren(); $('chartDates').replaceChildren(); $('historyStatus').textContent = selected.intraday ? '正在读取日内行情…' : '正在读取真实日历史…';
   try {
-    const result = await bridge('history',{base,quote,days:period,end:snapshot.date});
-    if (token !== historyToken) return;
-    const range = Core.historyRange(snapshot.date,period), records = Core.parseHistory(result.value,base,quote,range.from,range.to), stats = Core.statistics(records);
-    $('historyStatus').textContent = `${records.length} 个实际日记录 · ${result.offline ? '离线缓存' : 'ECB 参考汇率'}${result.warning ? ' · ' + result.warning : ''}`;
-    chart(records,stats); $('chartDates').append(element('span',records[0].date),element('span',records[records.length-1].date));
-    [['最高',stats.high],['最低',stats.low],['平均',stats.average],['涨跌',stats.change]].forEach(([label,value])=>{ const box=element('div');box.append(element('label',label),element('strong',label==='涨跌'?`${value>=0?'+':''}${value.toFixed(2)}%`:numberText(value)));$('stats').append(box); });
-  } catch(e) { if (token === historyToken) $('historyStatus').textContent = e.message; }
+    let records, result;
+    if (selected.intraday) {
+      result = await bridge('intraday', { base, quote, hours: period === 1 ? 24 : 168 }); if (token !== historyToken) return;
+      records = Core.validateIntraday(result.value, base, quote);
+    } else {
+      result = await bridge('history', { base, quote, days: period, end: snapshot.date }); if (token !== historyToken) return;
+      const range = Core.historyRange(snapshot.date, period); records = Core.parseHistory(result.value, base, quote, range.from, range.to);
+    }
+    const stats = Core.statistics(records), scale = detailAmount, fixed = v => (v * scale).toFixed(4);
+    $('historyStatus').textContent = `${records.length} 个${selected.intraday ? '行情点 · Yahoo Finance 市场行情' : '实际日记录 · ECB 参考汇率'}${result.offline ? ' · 离线缓存' : ''}${result.warning ? ' · ' + result.warning : ''}`;
+    chart(records, stats); $('chartDates').append(element('span', timeLabel(records[0].date)), element('span', timeLabel(records[records.length - 1].date)));
+    [['最高', stats.high], ['最低', stats.low], ['平均', stats.average], ['涨跌', stats.change]].forEach(([label, value]) => { const box = element('div'); box.append(element('label', label), element('strong', label === '涨跌' ? `${value >= 0 ? '+' : ''}${value.toFixed(4)}%` : fixed(value))); $('stats').append(box); });
+  } catch (e) { if (token === historyToken) $('historyStatus').textContent = e.message; }
 }
 function chart(records,stats) {
   const ns='http://www.w3.org/2000/svg';
@@ -191,7 +197,7 @@ function chart(records,stats) {
   else $('chart').append(svg('circle',{cx:points[0][0],cy:points[0][1],r:'3',fill:'#ef2c73'}));
   const title=svg('title',{});title.textContent=`${records[0].base}兑${records[0].quote}，${records[0].date}至${records[records.length-1].date}，最低${stats.low}，最高${stats.high}`;$('chart').prepend(title);
 }
-$('detailBack').onclick = () => { historyToken++; show('home'); }; $('pairChoice').onclick = () => openSelector({kind:'quote',back:'detail'});
+$('detailBack').onclick = () => { historyToken++; show('home'); };
 $('settings').onclick = () => { show('menu'); $('version').textContent = Core.VERSION; }; $('menuBack').onclick = () => show('home');
 $('close').onclick = async () => { await saveQueue; try {await bridge('close');}catch(e){toast(e.message);} };
 $('checkUpdate').onclick = async () => {

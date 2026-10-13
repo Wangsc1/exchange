@@ -72,8 +72,8 @@ export function keyInput(text:string,key:string):string {
   if(key==='.') return text+(tail?'':'0')+'.'
   return text==='0'?key:text+key
 }
-export const PERIODS = [{label:'7天',days:7},{label:'1月',days:30},{label:'6月',days:183},{label:'1年',days:365},{label:'3年',days:1095}]
-export function historyRange(end:string,days:number) {if(!validDate(end)||!PERIODS.some(p=>p.days===days))throw new Error('历史周期无效');const d=new Date(end+'T00:00:00Z');d.setUTCDate(d.getUTCDate()-days+1);return {from:d.toISOString().slice(0,10),to:end}}
+export const PERIODS:{label:string;days:number;intraday?:boolean}[] = [{label:'24时',days:1,intraday:true},{label:'7天',days:7,intraday:true},{label:'1月',days:30},{label:'6月',days:183},{label:'1年',days:365},{label:'3年',days:1095}]
+export function historyRange(end:string,days:number) {if(!validDate(end)||!PERIODS.some(p=>p.days===days&&!p.intraday))throw new Error('历史周期无效');const d=new Date(end+'T00:00:00Z');d.setUTCDate(d.getUTCDate()-days+1);return {from:d.toISOString().slice(0,10),to:end}}
 export function parseHistory(data:unknown,base:string,quote:string,from:string,to:string):Rate[] {
   if(!Array.isArray(data)||!data.length) throw new Error('这个周期没有历史数据')
   const seen=new Set<string>();const records=(data as Rate[]).map(r=>{
@@ -91,5 +91,31 @@ export async function cached<T>(store:CacheStore,key:string,load:()=>Promise<unk
   try {const value=validate(await load()); const saved=store.set(key,value); return {value,offline:false,warning:saved?'':'缓存保存失败，下次离线可能不可用'}}
   catch(e) {try{return {value:validate(store.get(key)),offline:true,warning:`连接失败，使用缓存：${e instanceof Error?e.message:'未知错误'}`}}catch{throw new Error(`无法取得数据且没有可用缓存：${e instanceof Error?e.message:'未知错误'}`)}}
 }
-export const VERSION='1.0.7'
+export const VERSION='1.0.8'
 export function newer(remote:string,local:string) {if(!/^\d+\.\d+\.\d+$/.test(remote)||!/^\d+\.\d+\.\d+$/.test(local))throw new Error('版本格式无效');const a=remote.split('.').map(Number),b=local.split('.').map(Number);for(let i=0;i<3;i++){if(a[i]!==b[i])return a[i]>b[i]}return false}
+
+// ---- 24时/7天：日内行情（Yahoo Finance 非官方图表接口），以 USD 为中间腿交叉计算 ----
+export type Point={t:number;v:number}
+export function parseYahoo(data:unknown):Point[] {
+  const r=(data as {chart?:{result?:{timestamp?:number[];indicators?:{quote?:{close?:(number|null)[]}[]}}[]}})?.chart?.result?.[0]
+  const ts=r?.timestamp,close=r?.indicators?.quote?.[0]?.close
+  if(!Array.isArray(ts)||!Array.isArray(close)||ts.length!==close.length) throw new Error('日内行情数据格式异常')
+  const out:Point[]=[];ts.forEach((t,i)=>{const v=close[i];if(Number.isFinite(t)&&typeof v==='number'&&Number.isFinite(v)&&v>0)out.push({t:t*1000,v})})
+  if(out.length<2) throw new Error('日内行情数据不足')
+  return out.sort((a,b)=>a.t-b.t)
+}
+// base/quote 均为“1 美元兑该币种”的序列（null 代表 USD=1）；返回 1 base 兑 quote，并截取最后 hours 小时。
+export function crossIntraday(base:string,quote:string,a:Point[]|null,b:Point[]|null,hours:number):Rate[] {
+  const A=a||[],B=b||[];const times=[...new Set([...A.map(p=>p.t),...B.map(p=>p.t)])].sort((x,y)=>x-y)
+  let i=0,j=0,va=a?0:1,vb=b?0:1;const all:Rate[]=[]
+  for(const t of times){while(i<A.length&&A[i].t<=t)va=A[i++].v;while(j<B.length&&B[j].t<=t)vb=B[j++].v;if(va>0&&vb>0)all.push({date:new Date(t).toISOString(),base,quote,rate:vb/va})}
+  if(all.length<2) throw new Error('日内行情数据不足')
+  const end=Date.parse(all[all.length-1].date),from=end-hours*3600000
+  const cut=all.filter(r=>Date.parse(r.date)>=from)
+  if(cut.length<2) throw new Error('日内行情数据不足')
+  return cut
+}
+export function validateIntraday(value:unknown,base:string,quote:string):Rate[] {
+  if(!Array.isArray(value)||value.length<2) throw new Error('日内缓存损坏')
+  return (value as Rate[]).map(r=>{if(!r||r.base!==base||r.quote!==quote||!Number.isFinite(Date.parse(r.date))||!Number.isFinite(r.rate)||r.rate<=0)throw new Error('日内缓存损坏');return {date:r.date,base,quote,rate:r.rate}})
+}

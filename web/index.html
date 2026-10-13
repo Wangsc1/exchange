@@ -9,13 +9,13 @@
   <section id="keyboard" aria-label="计算键盘"></section>
 </main>
 <section id="detail" class="page hidden">
-  <header><button id="detailBack">‹ 返回</button><span>汇率详情</span><button id="pairChoice">货币对</button></header>
-  <div id="pair" class="pair"></div><div id="bigAmount"></div><div id="unitRate" class="muted"></div>
+  <header><button id="detailBack">‹ 返回</button><span>汇率详情</span><span class="headerSpacer" aria-hidden="true"></span></header>
+  <div id="pair" class="pair"></div><div id="bigAmount"></div>
   <nav id="periods" aria-label="历史周期"></nav>
   <div id="historyStatus" class="muted" role="status"></div>
-  <svg id="chart" viewBox="0 0 360 210" role="img" aria-label="真实日历史汇率折线"></svg>
+  <svg id="chart" viewBox="0 0 360 210" role="img" aria-label="真实历史汇率折线"></svg>
   <div id="chartDates" class="muted"></div><div id="stats"></div>
-  <footer>数据源：Frankfurter · 欧洲央行（ECB）<br>工作日日更，日期以实际记录为准；仅供参考，非交易、银行或卡组织报价。周末与休市日无新点。</footer>
+  <footer>数据源：Frankfurter · 欧洲央行（ECB）；日内：Yahoo Finance<br>1月及以上为 ECB 工作日日更；24时与 7天为 Yahoo Finance 市场行情（非官方接口，休市时停留在最近交易时段）。仅供参考，非交易、银行或卡组织报价。</footer>
 </section>
 <section id="selector" class="page hidden">
   <header><button id="selectorBack">‹ 返回</button><h1 id="selectTitle">切换货币</h1><span class="headerSpacer" aria-hidden="true"></span></header>
