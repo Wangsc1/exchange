@@ -7,6 +7,7 @@
 采用官方 **WebViewController + 本地 HTML/CSS/JavaScript**，用于接近参考界面的深色布局。入口为 `index.tsx`；网络请求和持久化由原生代码处理，网页不加载 CDN、不依赖服务器、不使用浏览器 localStorage 保存配置。
 
 - 背景 `#14181b`，六行旗帜/代码/数值/中文名，基准行灰底；底部数据源与 4×4 数字/运算键盘。没有仿制状态栏、小程序胶囊或卡片边框。
+- 外观：深色为默认；iPhone 切到浅色（日间）模式时自动使用白底、深色文字和深灰键盘，数据与功能不变。
 - 左滑露出青色「汇率详情」；右滑露出蓝色「切换货币」，各占半行宽。
 - 使用官方 `addScriptMessageHandler` 接收页面消息；真机反馈证明依赖 postMessage 返回值会报“原生操作失败”，因此 1.0.1 起原生处理完成后用 `evaluateJavaScript` 调用页面 `window.__exchangeReply` 回传结果，页面按请求编号匹配并带 60 秒超时。
 - `present({ fullscreen: true })` 等待页面关闭；`finally` 中调用 `dispose()`、`Script.exit()`。菜单中也提供关闭按钮。

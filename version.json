@@ -1,5 +1,5 @@
 {
-  "version": "1.0.4",
-  "notes": "左滑或右滑到底后松手，自动打开汇率详情或切换货币页面。",
+  "version": "1.0.5",
+  "notes": "新增日间模式：跟随 iPhone 系统外观自动切换。",
   "files": ["index.tsx", "core.ts", "service.ts", "update.ts", "web/index.html", "web/style.css", "web/ui.js", "web/core.js"]
 }
