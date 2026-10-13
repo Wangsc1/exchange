@@ -1,5 +1,5 @@
 {
-  "version": "1.0.6",
-  "notes": "点击货币后按该货币100换算，基准金额灰显100并带闪烁光标。",
+  "version": "1.0.7",
+  "notes": "切换货币页新增右侧拼音首字母快速拖动定位，并删除右上角完成。",
   "files": ["index.tsx", "core.ts", "service.ts", "update.ts", "web/index.html", "web/style.css", "web/ui.js", "web/core.js"]
 }

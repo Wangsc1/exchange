@@ -95,12 +95,43 @@ $('clear').onclick = () => { input('AC'); fresh = true; }; $('equals').onclick =
 function available() { return snapshot ? Object.keys(snapshot.rates) : []; }
 function openSelector(value) { if (!snapshot) return toast('请先取得可用币种汇率'); selection = value; $('selectTitle').textContent = value.kind === 'row' ? '切换货币' : value.kind === 'base' ? '选择基准币种' : '选择目标币种'; $('search').value = ''; show('selector'); renderSelector(); }
 function selectedCode() { return selection.kind === 'row' ? config.codes[selection.index] : selection.kind === 'base' ? detailBase : detailQuote; }
+// 中文名称首字拼音首字母（固定表，避免依赖系统拼音排序）。
+const INITIAL = { USD:'M',CNY:'R',CAD:'J',EUR:'O',GBP:'Y',AUD:'A',BRL:'B',CHF:'R',CZK:'J',DKK:'D',HKD:'G',HUF:'X',IDR:'Y',ILS:'Y',INR:'Y',ISK:'B',JPY:'R',KRW:'H',MXN:'M',MYR:'M',NOK:'N',NZD:'X',PHP:'F',PLN:'B',RON:'L',SEK:'R',SGD:'X',THB:'T',TRY:'T',ZAR:'N' };
+function renderLetterIndex(letters) {
+  const box = $('letterIndex'); box.replaceChildren(); box.classList.toggle('hidden', !letters.length);
+  for (const l of letters) box.append(element('span', l.label, 'letter'));
+  box._letters = letters;
+}
+function jumpLetter(clientY) {
+  const box = $('letterIndex'), letters = box._letters || []; if (!letters.length) return;
+  const r = box.getBoundingClientRect(), i = Math.max(0, Math.min(letters.length - 1, Math.floor((clientY - r.top) / r.height * letters.length)));
+  const target = [...$('currencyList').querySelectorAll('.groupTitle')].find(t => t.dataset.key === letters[i].key);
+  if (target) $('currencyList').scrollTop = target.offsetTop;
+  $('letterBubble').textContent = letters[i].label; $('letterBubble').classList.remove('hidden');
+}
+{
+  const box = $('letterIndex'); let down = false;
+  box.onpointerdown = e => { down = true; try { box.setPointerCapture(e.pointerId); } catch {} e.preventDefault(); jumpLetter(e.clientY); };
+  box.onpointermove = e => { if (down) { e.preventDefault(); jumpLetter(e.clientY); } };
+  const end = () => { down = false; $('letterBubble').classList.add('hidden'); };
+  box.onpointerup = end; box.onpointercancel = end;
+}
 function renderSelector() {
   const query = $('search').value, found = Core.search(query, available()), common = Core.DEFAULT_CODES;
   $('currencyList').replaceChildren();
-  const groups = query.trim() ? [['搜索结果', found]] : [['常用', found.filter(c => common.includes(c.code))], ['全部', found]];
-  for (const [title, items] of groups) {
-    $('currencyList').append(element('div', title, 'groupTitle'));
+  const searching = !!query.trim(), letterOf = c => INITIAL[c.code] || '#';
+  const groups = searching ? [['搜索结果', found, 'search']] : [['常用', found.filter(c => common.includes(c.code)), 'common']];
+  const letters = [];
+  if (!searching) {
+    letters.push({ key: 'common', label: '#' });
+    for (const L of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') {
+      const items = found.filter(c => letterOf(c) === L).sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-u-co-pinyin'));
+      if (items.length) { groups.push([L, items, L]); letters.push({ key: L, label: L }); }
+    }
+  }
+  renderLetterIndex(letters);
+  for (const [title, items, key] of groups) {
+    const heading = element('div', title, 'groupTitle'); heading.dataset.key = key; $('currencyList').append(heading);
     for (const c of items) {
       const b = element('button', undefined, 'currency'), labels = element('span', undefined, 'labels');
       labels.append(element('span', c.name), element('small', c.code + ' · ' + c.region));
@@ -120,8 +151,8 @@ function renderSelector() {
   if (!found.length) $('currencyList').append(element('p', '没有匹配的可用法币', 'muted'));
 }
 $('search').oninput = renderSelector;
-function dismissSelector() { show(selection?.back || 'home'); }
-$('selectorBack').onclick = dismissSelector; $('selectorDone').onclick = dismissSelector;
+function dismissSelector() { $('letterIndex').classList.add('hidden'); $('letterBubble').classList.add('hidden'); show(selection?.back || 'home'); }
+$('selectorBack').onclick = dismissSelector;
 function openDetail(code) {
   if (!snapshot) return toast('请先取得汇率');
   try { detailBase = code; detailAmount = Core.convert(config.amount, config.base, code, snapshot); detailQuote = code === 'USD' ? 'CNY' : 'USD'; show('detail'); renderDetail(); } catch (e) { toast(e.message); }
