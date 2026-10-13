@@ -3,7 +3,7 @@
   "localizedNames": { "zh": "汇率" },
   "icon": "arrow.left.arrow.right",
   "color": "#58bfc0",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "法币参考汇率、真实日历史与计算器",
   "localizedDescriptions": { "zh": "法币参考汇率、真实日历史与计算器" },
   "remoteResource": { "url": "https://github.com/Wangsc1/exchange" }

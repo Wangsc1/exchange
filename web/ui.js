@@ -40,7 +40,7 @@ function renderRows() {
     const amounts = element('div', undefined, 'amounts');
     let amount = code === config.base ? config.amount : null;
     try { if (snapshot) amount = Core.convert(config.amount, config.base, code, snapshot); } catch { /* 没有行情的行显示破折号，不合成汇率。 */ }
-    amounts.append(element('div', amount === null ? '—' : formatted(amount), 'amount'), element('div', `${c.name} ${c.symbol}`, 'name'));
+    amounts.append(element('div', code === config.base ? expr : amount === null ? '—' : formatted(amount), 'amount'), element('div', `${c.name} ${c.symbol}`, 'name'));
     content.append(amounts); content.setAttribute('aria-label', `${c.name} ${amount === null ? '暂无数据' : numberText(amount)}，点击作为输入基准；左右滑动打开操作`);
     let startX = 0, startY = 0, startOffset = 0, offset = 0, moving = false, dragged = false;
     content.onpointerdown = event => { startX = event.clientX; startY = event.clientY; startOffset = offset; moving = false; dragged = false; };
@@ -68,7 +68,7 @@ function renderRows() {
       if (dragged) { dragged = false; return; }
       if (offset) { offset = 0; content.style.transform = ''; return; }
       if (!snapshot) return toast('请先刷新取得汇率');
-      try { config = Core.changeBase(config, code, snapshot); expr = numberText(config.amount); fresh = true; persist(); render(); } catch (e) { toast(e.message); }
+      try { config = { ...config, base: code, amount: 100 }; expr = '100'; fresh = true; persist(); render(); } catch (e) { toast(e.message); }
     };
     row.append(swap, info, content); $('rows').append(row);
   });

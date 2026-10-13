@@ -1,5 +1,5 @@
 {
-  "version": "1.0.5",
-  "notes": "新增日间模式：跟随 iPhone 系统外观自动切换。",
+  "version": "1.0.6",
+  "notes": "点击货币后按该货币100换算，基准金额灰显100并带闪烁光标。",
   "files": ["index.tsx", "core.ts", "service.ts", "update.ts", "web/index.html", "web/style.css", "web/ui.js", "web/core.js"]
 }
