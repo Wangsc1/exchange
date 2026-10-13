@@ -1,5 +1,5 @@
 {
-  "version": "1.0.12",
-  "notes": "放大返回按钮点击区域，并支持左边缘右滑返回。",
+  "version": "1.0.13",
+  "notes": "删除主页刷新按钮；每次进入和从后台返回都自动刷新。",
   "files": ["index.tsx", "core.ts", "service.ts", "update.ts", "web/index.html", "web/style.css", "web/ui.js", "web/core.js"]
 }

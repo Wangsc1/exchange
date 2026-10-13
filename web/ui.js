@@ -90,10 +90,10 @@ function render() {
   $('source').textContent = snapshot ? `Frankfurter · ECB | ${snapshot.date} · 工作日日更 · 仅供参考${offline ? ' | 离线缓存' : ''}${warning ? ' | ' + warning : ''}` : `Frankfurter · ECB | ${warning ? '取数失败：' + warning : '暂无数据，请联网刷新'}（仅供参考）`;
 }
 async function refresh() {
-  if (busy) return; busy = true; $('refresh').disabled = true;
+  if (busy) return; busy = true;
   try { const r = await bridge('latest'); snapshot = Core.validateSnapshot(r.value); offline = r.offline; warning = r.warning; if (warning) toast(warning); }
   catch (e) { warning = e.message; toast(e.message); }
-  finally { busy = false; $('refresh').disabled = false; render(); }
+  finally { busy = false; render(); }
 }
 function input(key) {
   if (key === '=') { try { config.amount = Core.calculate(expr); expr = numberText(config.amount); fresh = true; persist(); render(); } catch (e) { toast(e.message); } return; }
@@ -103,7 +103,7 @@ function input(key) {
   render();
 }
 ['7','8','9','+','4','5','6','-','1','2','3','×','.','0','⌫','÷'].forEach(key => { const b = element('button', key); b.setAttribute('aria-label', key === '⌫' ? '退格' : key); b.onclick = () => input(key); $('keyboard').append(b); });
-$('clear').onclick = () => { input('AC'); fresh = true; }; $('equals').onclick = () => input('='); $('refresh').onclick = refresh;
+$('clear').onclick = () => { input('AC'); fresh = true; }; $('equals').onclick = () => input('=');
 function available() { return snapshot ? Object.keys(snapshot.rates) : []; }
 function openSelector(value, dir = 'right') { if (!snapshot) return toast('请先取得可用币种汇率'); selection = value; $('selectTitle').textContent = value.kind === 'row' ? '切换货币' : value.kind === 'base' ? '选择基准币种' : '选择目标币种'; $('search').value = ''; show('selector', dir); renderSelector(); }
 function selectedCode() { return selection.kind === 'row' ? config.codes[selection.index] : selection.kind === 'base' ? detailBase : detailQuote; }
@@ -227,6 +227,9 @@ $('install').onclick = async () => {
 };
 async function start(){render();try{config=Core.normalizeConfig(await bridge('config'));expr=numberText(config.amount);render();}catch(e){toast(e.message);}await refresh();}
 start();
+// 每次进入都自动刷新：启动时一次；App 从后台回到前台时再刷新（距上次成功刷新超过 20 秒，避免频繁请求）。
+let lastRefresh = Date.now();
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - lastRefresh > 20000) { lastRefresh = Date.now(); refresh(); } });
 
 // 子页面支持从屏幕左边缘向右滑返回；命中区为左边缘 28px，水平位移超过 70px 且大于竖向位移时触发。
 {
