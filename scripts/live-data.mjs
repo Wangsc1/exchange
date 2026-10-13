@@ -1,43 +1,36 @@
-// 在线试验只读官方接口，不将任何历史试验结果作为手机离线兜底。
+// 只读真实公开接口；不写生产缓存，不使用测试夹具作为网络结果。
 import assert from 'node:assert/strict';
-import { Core } from '../tests/helpers.mjs';
-const API='https://api.frankfurter.dev/v2';
-async function get(path){const response=await fetch(API+path,{signal:AbortSignal.timeout(30000)});assert.equal(response.status,200,path);return response.json();}
-const specification=await get('/openapi.json');
-assert.ok(specification.paths['/rates']);
-assert.ok(specification.components.parameters.providers);
-const provider=await get('/providers/ECB');
-assert.equal(provider.rate_type,'reference rate');
-assert.equal(provider.publish_cadence,'daily');
-const catalog=await get('/currencies?providers=ECB');
-const snapshot=Core.parseLatest(await get('/rates?providers=ECB&base=EUR'));
-for(const code of Core.DEFAULT_CODES)assert.ok(catalog.some(c=>c.iso_code===code));
-const expected=new Set(Core.CURRENCIES.map(c=>c.code));
-assert.ok(Object.keys(snapshot.rates).every(code=>expected.has(code)));
-const checks=[];
-for(const p of Core.PERIODS.filter(x=>!x.intraday)){
-  const {from,to}=Core.historyRange(snapshot.date,p.days);
-  const records=Core.parseHistory(await get(`/rates?providers=ECB&base=AUD&quotes=USD&from=${from}&to=${to}`),'AUD','USD',from,to);
-  assert.ok(records.length>1,p.label);
-  assert.ok(records.every((r,i)=>!i||records[i-1].date<r.date));
-  const stats=Core.statistics(records);
-  assert.ok(stats.high>=stats.average&&stats.average>=stats.low);
-  checks.push({period:p.label,from,to,count:records.length,first:records[0],last:records.at(-1),statistics:stats});
+import {Core} from '../tests/helpers.mjs';
+async function get(url){const r=await fetch(url,{signal:AbortSignal.timeout(30000)});assert.equal(r.status,200,url);return r.json();}
+console.log('核验时间',new Date().toISOString());
+const providers=await get('https://api.frankfurter.dev/v2/providers');
+for(const key of ['ECB','BOC','BOE','BDI','BIS','HKMA','BOJ']){
+ const p=providers.find(p=>p.key===key);
+ console.log('央行目录',JSON.stringify({key,date:p.end_date,cadence:p.publish_cadence,count:p.currencies.length,missing:Core.DEFAULT_CODES.filter(c=>!p.currencies.includes(c)),terms:p.terms_url}));
 }
-// 对照同一天官方货币对，证明EUR交叉换算方向正确。
-const pair=await get(`/rate/CNY/USD?providers=ECB&date=${snapshot.date}`);
-assert.ok(Math.abs(Core.convert(1,'CNY','USD',snapshot)-pair.rate)<0.00001);
-const summary={checkedAt:new Date().toISOString(),api:API,provider:provider.name,rateType:provider.rate_type,latestDate:snapshot.date,currencyCount:Object.keys(snapshot.rates).length,cny100InUsd:Core.convert(100,'CNY','USD',snapshot),officialPair:pair,history:checks};
-console.log(JSON.stringify(summary,null,2));
-console.log('官方文档、最新汇率、五个真实日历史周期及交叉换算对照全部通过。');
-
-// 24时/7天：真实 Yahoo Finance 日内行情，覆盖全部 30 个币种（USD 为中间腿，AUD→USD 与 CNY→EUR 为交叉校验）。
+let ecb;
+for(const s of Core.SOURCES){
+ const raw=await get(s.url),snapshot=Core.parseSource(s.key,raw);
+ const rawCount=Array.isArray(raw)?raw.length:s.key==='er'?Object.keys(raw.rates).length:s.key==='float'?Object.keys(raw).length:Object.keys(raw.eur).length;
+ assert.ok(Core.DEFAULT_CODES.every(c=>snapshot.rates[c]>0));
+ console.log('最新汇率',JSON.stringify({key:s.key,name:s.name,url:s.url,date:snapshot.date,rawCount,currencyCount:Object.keys(snapshot.rates).length,perEUR:Object.fromEntries(Core.DEFAULT_CODES.map(c=>[c,snapshot.rates[c]]))}));
+ if(s.key==='ecb')ecb=snapshot;
+}
+// BOE、BDI 仅作排除证据，不进入生产可选源。
+for(const key of ['BOE','BDI']){const r=await get(`https://api.frankfurter.dev/v2/rates?providers=${key}&base=EUR`);console.log('排除候选',JSON.stringify({key,count:r.length,dates:[...new Set(r.map(x=>x.date))],defaultRates:r.filter(r=>Core.DEFAULT_CODES.includes(r.quote))}));}
+for(const p of Core.PERIODS.filter(p=>!p.intraday)){
+ const {from,to}=Core.historyRange(ecb.date,p.days);
+ const raw=await get(`https://api.frankfurter.dev/v2/rates?providers=ECB&base=AUD&quotes=USD&from=${from}&to=${to}`);
+ const records=Core.parseHistory(raw,'AUD','USD',from,to);assert.ok(records.length>1);
+ console.log('ECB 历史',JSON.stringify({period:p.label,count:records.length,first:records[0].date,last:records.at(-1).date}));
+}
+const pair=await get(`https://api.frankfurter.dev/v2/rate/CNY/USD?providers=ECB&date=${ecb.date}`);
+assert.ok(Math.abs(Core.convert(1,'CNY','USD',ecb)-pair.rate)<0.00001);
+console.log('同日交叉换算核对通过',JSON.stringify(pair));
+// Yahoo 为非官方接口，不把暂时不可用当成可合成行情。
 for(const [hours,range,interval] of [[24,'2d','15m'],[168,'7d','30m']]){
-  const fetchSeries=async code=>code==='USD'?null:Core.parseYahoo(await (await fetch(`https://query1.finance.yahoo.com/v8/finance/chart/USD${code}=X?interval=${interval}&range=${range}`,{headers:{'User-Agent':'Mozilla/5.0'}})).json());
-  const missing=[];
-  for(const c of Core.CURRENCIES){try{await fetchSeries(c.code)}catch(e){missing.push(c.code+':'+e.message)}}
-  console.log(`日内${hours}h 缺失币种：`,missing.length?missing.join(', '):'无');
-  const cny=await fetchSeries('CNY'),aud=await fetchSeries('AUD');
-  const pair=Core.crossIntraday('CNY','AUD',cny,aud,hours);
-  assert.ok(pair.length>10);console.log(`CNY→AUD ${hours}h 点数`,pair.length,'最新',pair.at(-1).rate);
+ const load=async code=>Core.parseYahoo(await get(`https://query1.finance.yahoo.com/v8/finance/chart/USD${code}=X?interval=${interval}&range=${range}`));
+ const [a,b]=await Promise.all([load('CNY'),load('AUD')]);const records=Core.crossIntraday('CNY','AUD',a,b,hours);assert.ok(records.length>1);
+ console.log('Yahoo 日内',JSON.stringify({hours,count:records.length,last:records.at(-1)}));
 }
+console.log('所有纳入源、ECB历史、交叉换算与Yahoo日内真实接口验证通过。');

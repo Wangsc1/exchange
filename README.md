@@ -1,139 +1,110 @@
 # 汇率
 
-面向 **iPhone Scripting App** 的法币参考汇率工具，**不是 Scriptable**。仓库名为 `exchange`，App 内名称为「汇率」。仅提供参考汇率与真实日历史，不提供加密货币、银行或卡组织牌价。
+面向 **iPhone Scripting App** 的法币参考汇率工具（不是 Scriptable）。本地版本 **1.1.0**，本轮未发布 GitHub。数据仅供参考，不是实时成交价、银行或银行卡结算报价；不提供数字货币。
 
-## 实现方案
+## 实现与使用
 
-采用官方 **WebViewController + 本地 HTML/CSS/JavaScript**，用于接近参考界面的深色布局。入口为 `index.tsx`；网络请求和持久化由原生代码处理，网页不加载 CDN、不依赖服务器、不使用浏览器 localStorage 保存配置。
+采用官方 **WebViewController + web/ 本地 HTML/CSS/JS**。入口 `index.tsx` 使用 `addScriptMessageHandler` 接收页面 `postMessage`，原生完成后用 `evaluateJavaScript` 调 `window.__exchangeReply` 回传结果；按请求编号匹配，60 秒超时。网络和 Storage 均由原生完成，不使用网页 localStorage。`present({fullscreen:true})` 等待关闭，最终 `dispose()` 和 `Script.exit()`。
 
-- 背景 `#14181b`，六行旗帜/代码/数值/中文名，基准行灰底；底部数据源与 4×4 数字/运算键盘。没有仿制状态栏、小程序胶囊或卡片边框。
-- 外观：深色为默认；iPhone 切到浅色（日间）模式时自动使用白底、深色文字和深灰键盘，数据与功能不变。
-- 主页没有刷新按钮：每次进入自动取最新汇率；App 从后台回到前台且距上次刷新超过 20 秒时再自动刷新。
-- 详情、切换货币和设置页的「返回」点击区域已放大；也可从屏幕左边缘向右滑返回。
-- 左滑露出青色「汇率详情」，右滑露出蓝色「切换货币」；滑过行宽一半松手，自动进入对应页面；未过一半则直接弹回，不停留在半开状态。
-- 主页右上角没有按钮，标题右侧留空。
-- 使用官方 `addScriptMessageHandler` 接收页面消息；真机反馈证明依赖 postMessage 返回值会报“原生操作失败”，因此 1.0.1 起原生处理完成后用 `evaluateJavaScript` 调用页面 `window.__exchangeReply` 回传结果，页面按请求编号匹配并带 60 秒超时。
-- `present({ fullscreen: true })` 等待页面关闭；`finally` 中调用 `dispose()`、`Script.exit()`。菜单中也提供关闭按钮。
-- 唯一业务源是 `core.ts`；`web/core.js` 是预编译版本。手机无需 Node、npm 或编译步骤。
+- 主页六行旗帜、代码、数值、中文名称；初始 USD、CNY、CAD、EUR、GBP、AUD，基准 CNY，金额 100。右上角只有线条设置按钮，无刷新和更新按钮，无版本文字。
+- 点击货币行，将其作为基准并重置为「货币默认值」（默认 100）。替换基准行币种仍保留当前金额等值；其他行已用币种不能重复。
+- 左滑青色「汇率详情」，右滑蓝色「切换货币」。滑过行宽一半松手自动进入；未过半回弹、不停留半开。页面方向动画和行回弹保留，尊重减少动态效果偏好。
+- 子页面返回按钮热区至少 88×52；屏幕左边缘 28px 内起始右滑超过 70px，且明显大于竖向位移，可返回。设置二级页返回设置主页。
+- 键盘 `+ - × ÷` 遵循运算优先级；AC 清空、= 结算、退格。未完成算式保留最后有效金额，除零、无效算式和超范围提示。输入表达式不被显示小数位强行截断。
+- 详情基准金额使用当前「货币默认值」，详情币种修改不影响主页。货币选择支持中文/代码/国家地区搜索、拼音首字母索引拖动定位、右侧对勾。
+- 继承深浅色变量和 DinLike 字体。内嵌字体为开源 Barlow，SIL OFL 1.1，许可见 `FONT-LICENSE-Barlow-OFL.txt`；中文使用系统字体。无网络字体，不仿制状态栏。
 
-本实现参考了官方文档的 WebViewController、FileManager、Storage、fetch、Script API 与脚本元数据说明，并遵循官方示例的模块导入/全局 API 约定。
+## 换算设置
 
-## 安装与使用
+顶部显示「上次更新 今天HH:mm / 昨天HH:mm / 日期HH:mm」：取当前源最近一次成功取得汇率的本地时间，不拿它冒充报价日期。成功取得时间随该源单独保存；离线回退不改为当前时间，旧缓存没有时间记录时显示「暂无成功记录」。
 
-1. 使用当前 App Store 版 **Scripting**。建议升级最新版，以具备本文使用的 Promise WebView 消息桥和文件 API；没有编造未经核验的最低版本字段。
-2. 首次安装：[一键导入「汇率」](https://scripting.fun/import_scripts?urls=["https%3A%2F%2Fgithub.com%2FWangsc1%2Fexchange"])。在 iPhone 上使用此链接并交给 Scripting 导入。也可将本目录内容导入脚本，保持相对目录结构；若使用 ZIP，`script.json` 与 `index.tsx` 应位于脚本根目录，不要多包一层目录。不要粘贴到 Scriptable。
-3. 手机运行必须包含：`script.json`、`index.tsx`、`core.ts`、`service.ts`、`update.ts` 和整个 `web/`。`scripts/`、`tests/`、`package.json` 仅用于电脑验证，可不导入手机。
-4. 首次运行需联网。默认 `USD、CNY、CAD、EUR、GBP、AUD`，初始输入为 `CNY 100`。
-5. 点击某一行：该币种成为输入基准，金额重置为 100，并以灰色显示 `100`，光标在个位后闪烁；其他币种按 100 立即换算。右滑可替换该行；其他行已使用的币种不可重复选择。基准行被替换时保留当前金额等值。
-6. 输入数字可重新输入金额；`+ - × ÷` 支持通常的运算优先级。键盘上方提供 **AC（清空）** 和 **=（结算）**，右下为退格。未完成的算式保留最后有效金额，按等号时显示错误。除零、无效算式和超范围金额会提示。
-7. 详情可点击货币对左右币种分别选择基准/目标；详情调整不改变主列表配置。选择列表右侧有按中文名拼音首字母的 A-Z 快速定位条，按住拖动可连续跳转并显示当前字母；没有右上角“完成”，用左上角返回；可按中文名称、英文币种代码、中文国家/地区搜索，显示选中勾与不可重复项。
+- **货币符号**默认开，控制主页名称后的符号。
+- **显示换算汇率源**默认开，控制主页来源/日期行；关闭不会删除缓存，也不隐藏设置中的永久数据署名。
+- **换算汇率源**单选，显示名称、真实更新频率说明和右侧对勾。切换保存后立即调用该源取数并刷新主页；近期缓存可因限频直接返回。异步旧源响应不能覆盖新源。失败只回退该源缓存，不借用其他源。
+- **货币默认值**：1 / 10 / 100 / 1,000 / 10,000，默认 100；影响下一次主页基准点击、详情打开/基准选择及恢复默认列表，不擅自修改正在输入的金额。
+- **小数点位数**：法币 0–8 位，默认 2，影响主页换算金额、详情换算金额及最高/最低/平均金额显示。涨跌百分比仍保留原 4 位；基准输入保留用户原始表达式和精度。
+- **恢复默认币种列表**居中显示，必须 confirm 二次确认；恢复 USD、CNY、CAD、EUR、GBP、AUD，基准 CNY，金额使用当前默认值。不重置其他设置或缓存。
+- 设置主页底部居中显示「汇率 版本 1.1.0」，来自 `core.ts VERSION`。
 
-旗帜采用系统旗帜 emoji；具体字形、Safe Area 和宿主是否保留导航区域须以 iPhone 实际显示为准。
+**未提供「当地货币」开关。** `Intl` 与 `navigator.language` 提供语言/地区，不直接提供系统货币；语言可能没有地区，系统语言地区也不等于用户货币偏好。标准 Intl 没有“读取默认货币”的可靠 API。按用户允许的降级选择不猜测、不强行改动用户列表；未使用 IP 或定位。未添加「更多设置」或数字货币小数位。
 
-## 字体
+## 汇率源、公开接口与条款
 
-界面数字和文字使用内嵌的开源 **Barlow**（SIL Open Font License 1.1，许可全文见 `FONT-LICENSE-Barlow-OFL.txt`）细体/常规体，字形接近参考截图的 DIN 风格数字；以 base64 内嵌在 `web/style.css`，不依赖网络字体。中文使用 iPhone 系统字体（苹方）。
+2026-10-13 已逐个读取真实端点及公开说明。以下均无需 API Key，生产解析只保留 `core.ts CURRENCIES` 中的 30 种法币，默认六币缺任意一个即报错并尝试本源缓存。可用币种列表与实际快照取交集，BOC 只覆盖其中 23 种。所有快照统一为 `{date, rates: 每EUR兑换}`；金额按 `金额 ÷ 基准每EUR报价 × 目标每EUR报价` 交叉换算。
 
-## 真实数据与历史口径
+| key | 名称 / 端点 | 频率、许可及限制 |
+|---|---|---|
+| ecb（默认） | Frankfurter · 欧洲央行 ECB；`https://api.frankfurter.dev/v2/rates?providers=ECB&base=EUR` | ECB 参考汇率，工作日更新。Frankfurter 为免费公开 API；ECB [免责声明与使用说明](https://www.ecb.europa.eu/services/using-our-site/disclaimer/html/index.en.html)允许再利用公共资料并要求署名，来源在页面据实显示。 |
+| boc | Frankfurter · 加拿大央行 BOC；同一 `/rates?providers=BOC&base=EUR` | 指示汇率，工作日更新，EUR 交叉换算。[加拿大央行条款](https://www.bankofcanada.ca/terms/)允许免费使用/复制/分发，要求署名、说明修改和准确性；本工具标明 BOC、交叉换算，不使用其 logo，不声称央行背书。此次日期 10月9日，较 ECB 落后，保留真实日期，不当作实时。 |
+| er | ExchangeRate-API；`https://open.er-api.com/v6/latest/EUR` | 166 币种，每日更新。[开放端点说明](https://www.exchangerate-api.com/docs/free)明确允许免费个人/商业换算与缓存，要求署名、限频，禁止再分发原始数据。设置页有永久提供方链接；不提供原始数据下载或转售。同一脚本私有存储的一小时内最多尝试一次此端点（包括失败），启动和切换也遵守；不是固定 API 配额承诺，HTTP 429 如实回退缓存。[条款](https://www.exchangerate-api.com/terms)。 |
+| fawaz-cdn | 开源汇率 · jsDelivr；`https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/eur.json` | [fawazahmed0 项目](https://github.com/fawazahmed0/exchange-api)标示免费、每日更新、无需 Key；[CC0 1.0](https://github.com/fawazahmed0/exchange-api/blob/main/LICENSE)。原始代码为小写，含加密/金属/旧币，生产仅白名单法币；CDN 日期可滞后。 |
+| fawaz-pages | 开源汇率 · Cloudflare；`https://latest.currency-api.pages.dev/v1/currencies/eur.json` | 同一开源项目的公开备用域名，每日数据，条款同上。作为单独可选端点、独立缓存，可能与 CDN 日期不同，绝不混合或默默替换。 |
+| float | FloatRates；`https://www.floatrates.com/daily/eur.json` | [官方免费 JSON feeds 说明](https://www.floatrates.com/json-feeds.html)邀请直接使用公开链接，称每12小时（12 AM/PM）更新；原始 146 个报价，EUR 本身不在响应中，按请求基准补 EUR=1。报价 rate 为字符串，date 为 GMT 时间；综合参考汇率，不称实时。提供方署名永久保留。本次没有发现额外公开限频/商业授权条款，免费使用依据是上述明确提供的免费 feeds，不保证未来条款不变。 |
 
-2026-10-13 核验的 Frankfurter **现行官方 API 为 v2**，无需 API Key。虽然 v2 支持多个来源，本工具固定 `providers=ECB`（欧洲央行），避免把来源不同的汇率混合成不清楚的报价。
+Frankfurter [官方文档](https://www.frankfurter.dev/)及 [v2 provider 目录](https://api.frankfurter.dev/v2/providers)用于确认来源属性。仅精选 BOC 作为新增央行来源，未默认纳入整个目录：
 
-- 最新行情：`https://api.frankfurter.dev/v2/rates?providers=ECB&base=EUR`
-- 货币资料：`/v2/currencies?providers=ECB`
-- 日历史：`/v2/rates?providers=ECB&base=AUD&quotes=USD&from=...&to=...`
-- 来源属性：`/v2/providers/ECB`，实测 `rate_type = reference rate`、`publish_cadence = daily`。
+- **BOE** 实测覆盖六币、27 条，日期 2026-10-09，但[法律页](https://www.bankofengland.co.uk/legal)明确部分汇率系列来自第三方，不受通用 Open Government Licence 覆盖，复用需联系。不能确定本工具全部所用系列已获授权，因此排除。
+- **BDI** 实测 151 条，日期混合 10月12日/9日；不满足本工具同日快照，不纳入，也不将旧日期重写为新日期。
+- **BIS、HKMA** 目录最新分别为 9月30日、8月31日且月更，不能作为此次近期工作日参考源；**BOJ** 只有4币，缺 CNY/CAD/GBP/AUD。未纳入。其他 provider 未完成逐个许可核验，未纳入；目录里有来源不等于适合本项目。
 
-界面提供当前 ECB 常规发布、且本工具有中文资料的 **30 个法币**，选择列表还会与实际取得的最新行情取交集。「全部」指此数据源支持的工具币种，不是全球所有货币；不会纳入 BTC/USDT 或已经停止发布的币种。
+这些来源/中转/非官方接口都可能变更或停止服务，不保证 SLA、即时更新或交易准确性。界面始终显示真实数据日期与来源，不把任何源称为“实时”。
 
-换算以同一日期的 EUR 快照交叉计算：`金额 ÷ 基准币种每EUR报价 × 目标币种每EUR报价`。界面显示真实发布日期，而不是把请求时间伪装成行情日期。ECB 在工作日更新；周末、节假日可能停留在最近工作日。
+## 历史走势
 
-详情提供 **24时、7天**（Yahoo Finance 非官方市场行情，15/30分钟点，以 USD 为中间腿交叉计算；休市时停留在最近交易时段，接口可能变更；实测冰岛克朗 ISK 的 24时数据不足，选到它时会如实提示“日内行情数据不足”，不画假曲线，可改看1月及以上）以及 **1月、6月、1年、3年** 的 ECB 日历史，分别为截至最新报价日的 7/30/183/365/1095 个日历日。日内曲线只用真实返回点，不虚构盘中点。详情页的基准金额固定按 100 计算，最高/最低/平均按 100 单位换算，涨跌为百分比；已删除货币对按钮和单位汇率行。X 轴使用真实日期间距，周末不补假点。API 可能在区间起点为休市日时携带前一个工作日的报价：程序校验后过滤区间外记录，绝不把旧报价改成周末日期。
+24时、7天保持 **Yahoo Finance 非官方图表接口**，15/30分钟点，以 USD 为中间腿交叉计算；休市停留在最近交易时段。原有 ISK 日内不足问题仍如实报错，不画假曲线。
 
-最高/最低/平均针对「1 单位基准币种兑换的目标币种汇率」；平均为实际日记录的算术平均，涨跌为 `(末点 / 首点 - 1) × 100%`，不是全天成交价涨跌。历史范围和实际首末日期均显示在详情中。
+1月、6月、1年、3年统一使用 **Frankfurter ECB 历史**（30/183/365/1095 日历日），即使最新换算选择其他源也不混为该源历史；详情底部明确显示「历史走势：ECB」。本轮未增加其他提供方的历史适配，fawaz 项目虽有日期端点也未宣称当前支持。历史范围以当前快照日期为截止日，X轴为真实日期间距，周末不补点；接口携带区间起点前的报价会被过滤。最高/最低/平均是实际点统计，涨跌 `(末点 / 首点 - 1) × 100%`。
 
-**数据仅供参考，不是实时成交价、兑换承诺、银行或银行卡结算报价。**
+## 缓存与持久化
 
-## 缓存、配置与错误
+官方私有 Storage：`config.v1` 保留六币种/基准/金额；独立 `settings.v1` 保留显示开关、源、默认金额、小数位。逐字段校验，字段顺序不同不误报；损坏恢复默认。设置保存失败提示且不冒充成功。
 
-- 使用官方脚本私有 `Storage`，与 `script.json` 分离。保留六币种选择、基准币种和金额；未完成算式不跨运行保存。
-- 最新汇率与历史在成功取数和校验后缓存。历史按货币对/周期保留最多 60 份，最新快照和配置不受此淘汰规则影响。未打开过的历史周期不能凭空离线生成。
-- HTTP 错误、超时、解析/数据异常会尝试已经取得的真实缓存，并明确标记「离线缓存」、日期和错误原因。
-- 无有效缓存时显示错误和破折号，不内置伪造行情。首次离线无法换算。损坏配置恢复默认，损坏行情缓存不能充当报价。
-- 原生网络超时为 20 秒。Storage 写入失败会提示；官方说明其磁盘持久化异步进行，不能承诺在强制终止瞬间已经刷盘。
-- 本工具不上传用户输入金额或币种配置；汇率请求只包含所需货币对和日期区间。
+最新缓存键：`rates.ecb.v2`、`rates.boc.v1`、`rates.er.v1`、`rates.fawaz-cdn.v1`、`rates.fawaz-pages.v1`、`rates.float.v1`，成功取得时间使用各键加 `.fetchedAt`；er 请求尝试另记 `.attemptAt` 用于失败时也限频。每源独立校验、不串用；ECB 保留原缓存键。其他源20秒内复用最近成功缓存，er一小时内复用；请求失败后的一小时内只回退本源缓存，无缓存则提示限频。超出时才网络取数。回到前台超过20秒触发刷新，仍遵守源限频。
 
-## 更新
+HTTP、超时、解析失败仅回退已经取得的本源真实缓存，显示「离线缓存」和原因。无有效缓存显示错误和破折号，不内置行情。历史/日内缓存按货币对/周期最多60份；不清除配置或最新快照。网络20秒超时；Storage 写入可能异步刷盘，不承诺强制终止瞬间持久化。不会上传用户金额或列表配置。
 
-应用内已不再提供设置页和更新按钮。程序托管在公开仓库 `Wangsc1/exchange`；更新方式是重新使用一键导入链接覆盖安装。`script.json` 保留 `remoteResource.url`，手机端 Storage 中的币种、金额和缓存不属于脚本文件。`update.ts`、`service.ts` 中的在线更新代码暂时保留，但界面不再调用。
+## 安装与更新
+
+使用当前 Scripting App。一键导入：[导入汇率](https://scripting.fun/import_scripts?urls=["https%3A%2F%2Fgithub.com%2FWangsc1%2Fexchange"])。本地导入需包含 `script.json`、`index.tsx`、`core.ts`、`service.ts` 和整个 `web/`，保持目录结构。`scripts/`、`tests/`、`package.json` 仅电脑验证。
+
+更新用 **Scripting 自带长按更新或一键导入**。已删除应用内更新入口及 `update.ts`、版本检查/安装代码；保留 `script.json.remoteResource.url`（长按更新依赖）。`version.json` 保持中文摘要与文件清单，不再列出 update.ts；与 script.json 和 core.ts VERSION 同步为1.1.0。不通过脚本自己写程序文件。
 
 ## 本地验证
 
-电脑需要 Node 20+。开发依赖只用于验证，手机不需要。具有 npm 的电脑可执行：
+Node 20+，手机无需编译。可 `npm install` 后运行对应 npm scripts，或用临时依赖：
 
 ```sh
-npm install
-npm run build
-npm run check
-npm test
-npm run test:live
-```
-
-如果仅使用临时依赖，可设置 `TYPESCRIPT_PATH` 为 `typescript/lib/typescript.js` 的绝对路径，`HAPPY_DOM_PATH` 为 `happy-dom/lib/index.js` 的绝对路径，再执行同名 Node 脚本。例如：
-
-```sh
+export TYPESCRIPT_PATH=/tmp/chk/node_modules/typescript/lib/typescript.js
+export HAPPY_DOM_PATH=/tmp/exchange-validation/node_modules/happy-dom/lib/index.js
 node scripts/build.mjs
 node scripts/check.mjs
 node --test tests/*.test.mjs
 node scripts/live-data.mjs
 ```
 
-`check.mjs` 严格类型检查纯业务/更新模块，检查全部 TS/JS 语法、浏览器构建一致性及元数据。测试覆盖计算、点击重置为100的基准切换、替换/重复拒绝、搜索、缓存网络/HTTP错误、无缓存/坏缓存、配置保存、日历史/休市边界、双向滑动、详情选择、更新失败回滚、不覆盖 script.json，以及模拟宿主生命周期。
+`check.mjs` 严格检查 core.ts，检查入口语法、JS语法、生成一致性和三处版本。完整宿主类型需 App 同步官方 `.d.ts`，可 `node scripts/check.mjs /官方声明目录`；本轮未提供，不伪造宿主声明。
 
-`live-data.mjs` 只读官方文档与真实接口，校验最新行情、五个日历史周期、真实记录及交叉换算方向。测试夹具仅在 `tests/` 中，生产代码从不使用它们。
+测试夹具只位于 tests/；覆盖计算/键盘、手势、索引、历史、缓存、设置进入返回/开关/持久化/小数位/默认金额/恢复确认、源解析/缺默认币/独立缓存/限频、版本与更新删除。DOM 与原生桥为明确模拟，不等于 iOS 真机验证。
 
-### 本次验证证据（2026-10-13，北京时间）
+### 真实接口证据（2026-10-13 22:56，北京时间）
 
-- Node `20.19.2`，TypeScript `5.9.3`；纯业务严格类型、全部入口语法和构建一致性通过。
-- **29/29** 个本地单元/DOM集成测试通过；DOM 桥与 iOS 宿主在这些测试中为明确的模拟对象。
-- 官方 API 返回最新 ECB 日期 **2026-10-12**，30 个币种；CNY 100 的交叉换算为约 USD **14.94146889**，与同日官方货币对（按源接口精度）核对通过。
-- AUD→USD：7天/1月/6月/1年/3年分别取得 **5 / 21 / 130 / 255 / 763** 个周期内真实日记录，统计校验通过。
-- 已验证真实接口的「休市日起点携带前工作日记录」行为，并加入回归测试。
+`live-data.mjs` 实际运行通过，逐源解析后日期、原始数/保留法币数如下；数值单位为每EUR兑换：
 
-### 仍需 iPhone 验证的部分
+| 源 | 日期 | 原始/保留 | USD | CNY | CAD | EUR | GBP | AUD |
+|---|---|---|---|---|---|---|---|---|
+| ECB | 2026-10-13 | 30/30 | 1.1188 | 7.489 | 1.5933 | 1 | .8446 | 1.6033 |
+| BOC | 2026-10-09 | 25/23 | 1.1196 | 7.4944 | 1.5978 | 1 | .84634 | 1.6045 |
+| ExchangeRate-API | 2026-10-12 | 166/30 | 1.117127 | 7.488851 | 1.594414 | 1 | .845124 | 1.604265 |
+| jsDelivr | 2026-10-12 | 339/30 | 1.12004391 | 7.4965493 | 1.59732416 | 1 | .84622581 | 1.60602353 |
+| Cloudflare | 2026-10-13 | 340/30 | 1.11751153 | 7.48258698 | 1.59468036 | 1 | .84520585 | 1.60526262 |
+| FloatRates | 2026-10-13 | 146/30 | 1.11778798 | 7.48434566 | 1.59465976 | 1 | .84501447 | 1.60519867 |
 
-**上述不是 iOS 真机验证。** 当前没有连接 iPhone，也没有取得 App 同步的官方 `.d.ts`；官方开发指南说明这些声明由连接的 App 经 scripting-cli 同步，公开 CLI 包不包含完整宿主类型。本次没有伪造声明或把纯业务检查称为官方宿主完整类型检查。
+ECB 1月/6月/1年/3年取得22/130/255/764条，CNY→USD同日官方报价 .14939 交叉核对通过；Yahoo CNY→AUD 24时/7天取得98/240点。输出记录：`/tmp/exchange-live-1.1.0.txt`（临时验证证据，不是生产缓存）。网络结果随时间变化，不保证重跑完全一致。
 
-取得官方声明后，可执行：
-
-```sh
-node scripts/check.mjs /绝对路径/官方类型声明目录
-```
-
-还需在真实 Scripting 中确认：桥接返回与生命周期、系统 Safe Area/键盘/旗帜渲染、真实触摸滑动、Storage 跨运行持久化、权限/离线体验及本地文件更新。服务器侧的公开文件检查不等于手机上真实导入、更新成功。
+本轮 `node scripts/build.mjs`、`node scripts/check.mjs` 与 `node --test tests/*.test.mjs` 全部通过，最终 **50/50** 个单元/DOM测试通过。**没有做 iPhone 真机验证**：Safe Area、真实触摸、宿主外链、跨运行 Storage、长按更新实际导入仍需手机验证；不能将电脑模拟称为真机结果。
 
 ## 文件结构
 
-```text
-FONT-LICENSE-Barlow-OFL.txt  内嵌字体许可
-script.json             脚本元数据（App名称：汇率）
-index.tsx               原生入口、桥接、生命周期
-core.ts                 业务算法与校验
-service.ts              Frankfurter取数、Storage缓存/配置
-update.ts               白名单更新与错误回滚
-version.json            公开更新清单
-web/index.html          本地页面模板
-web/style.css           深色布局
-web/ui.js               交互、手势与真实历史SVG
-web/core.js             业务模块预编译产物
-scripts/build.mjs       构建浏览器业务脚本
-scripts/check.mjs       类型/语法/元数据/构建检查
-scripts/live-data.mjs   真实官方接口验证
- tests/                 计算、缓存、更新和DOM集成测试
-package.json            电脑验证依赖与命令
-```
+`index.tsx`：桥接入口；`core.ts`：算法/源定义/解析/设置校验；`service.ts`：网络与Storage；`script.json`：元数据/remoteResource；`version.json`：版本摘要/文件清单；`web/index.html/style.css/ui.js/core.js`：本地界面与生成业务脚本；`scripts/`：build/check/live-data；`tests/`：单元与DOM集成测试；`FONT-LICENSE-Barlow-OFL.txt`：字体许可。无 update.ts。
 
-## 官方资料
-
-- Scripting：[官网](https://scriptingapp.github.io/) · [官方文档索引](https://scriptingapp.github.io/llms.txt) · [官方开发指南](https://github.com/ScriptingApp/scripting-app-development)
-- Frankfurter：[官方文档](https://www.frankfurter.dev/) · [现行索引](https://www.frankfurter.dev/llms.txt) · [v2 OpenAPI](https://api.frankfurter.dev/v2/openapi.json)
-- ECB：[参考汇率说明](https://www.ecb.europa.eu/stats/policy_and_exchange_rates/euro_reference_exchange_rates/html/index.en.html)
+官方 Scripting：[文档索引](https://scriptingapp.github.io/llms.txt) · [开发指南](https://github.com/ScriptingApp/scripting-app-development)。

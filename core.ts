@@ -91,8 +91,7 @@ export async function cached<T>(store:CacheStore,key:string,load:()=>Promise<unk
   try {const value=validate(await load()); const saved=store.set(key,value); return {value,offline:false,warning:saved?'':'缓存保存失败，下次离线可能不可用'}}
   catch(e) {try{return {value:validate(store.get(key)),offline:true,warning:`连接失败，使用缓存：${e instanceof Error?e.message:'未知错误'}`}}catch{throw new Error(`无法取得数据且没有可用缓存：${e instanceof Error?e.message:'未知错误'}`)}}
 }
-export const VERSION='1.0.15'
-export function newer(remote:string,local:string) {if(!/^\d+\.\d+\.\d+$/.test(remote)||!/^\d+\.\d+\.\d+$/.test(local))throw new Error('版本格式无效');const a=remote.split('.').map(Number),b=local.split('.').map(Number);for(let i=0;i<3;i++){if(a[i]!==b[i])return a[i]>b[i]}return false}
+export const VERSION='1.1.0'
 
 // ---- 24时/7天：日内行情（Yahoo Finance 非官方图表接口），以 USD 为中间腿交叉计算 ----
 export type Point={t:number;v:number}
@@ -118,4 +117,39 @@ export function crossIntraday(base:string,quote:string,a:Point[]|null,b:Point[]|
 export function validateIntraday(value:unknown,base:string,quote:string):Rate[] {
   if(!Array.isArray(value)||value.length<2) throw new Error('日内缓存损坏')
   return (value as Rate[]).map(r=>{if(!r||r.base!==base||r.quote!==quote||!Number.isFinite(Date.parse(r.date))||!Number.isFinite(r.rate)||r.rate<=0)throw new Error('日内缓存损坏');return {date:r.date,base,quote,rate:r.rate}})
+}
+
+export const SOURCES = [
+ {key:'ecb',name:'Frankfurter · 欧洲央行 ECB',description:'欧洲央行参考汇率，工作日更新',url:'https://api.frankfurter.dev/v2/rates?providers=ECB&base=EUR',cache:'rates.ecb.v2'},
+ {key:'boc',name:'Frankfurter · 加拿大央行 BOC',description:'加拿大央行指示汇率，工作日更新；交叉换算',url:'https://api.frankfurter.dev/v2/rates?providers=BOC&base=EUR',cache:'rates.boc.v1'},
+ {key:'er',name:'ExchangeRate-API',description:'开放参考汇率，每日更新',url:'https://open.er-api.com/v6/latest/EUR',cache:'rates.er.v1'},
+ {key:'fawaz-cdn',name:'开源汇率 · jsDelivr',description:'fawazahmed0 每日数据，CDN 日期可能滞后',url:'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/eur.json',cache:'rates.fawaz-cdn.v1'},
+ {key:'fawaz-pages',name:'开源汇率 · Cloudflare',description:'fawazahmed0 每日数据',url:'https://latest.currency-api.pages.dev/v1/currencies/eur.json',cache:'rates.fawaz-pages.v1'},
+ {key:'float',name:'FloatRates',description:'综合参考汇率，约每12小时更新',url:'https://www.floatrates.com/daily/eur.json',cache:'rates.float.v1'}
+]
+export type Settings={symbols:boolean;showSource:boolean;source:string;defaultAmount:number;decimals:number}
+export function normalizeSettings(value:unknown):Settings {
+ const v=value as Settings
+ if(!v||typeof v.symbols!=='boolean'||typeof v.showSource!=='boolean'||!SOURCES.some(s=>s.key===v.source)||![1,10,100,1000,10000].includes(v.defaultAmount)||!Number.isInteger(v.decimals)||v.decimals<0||v.decimals>8)return {symbols:true,showSource:true,source:'ecb',defaultAmount:100,decimals:2}
+ return {symbols:v.symbols,showSource:v.showSource,source:v.source,defaultAmount:v.defaultAmount,decimals:v.decimals}
+}
+export function parseSource(key:string,data:unknown):Snapshot {
+ if(!SOURCES.some(s=>s.key===key))throw new Error('未知汇率源')
+ const d=data as any
+ if(key==='ecb'||key==='boc') {
+  if(!Array.isArray(d))throw new Error('汇率数据格式异常')
+  return parseLatest(d.filter((r:any)=>CURRENCIES.some(c=>c.code===r?.quote)))
+ }
+ let date='', raw:Record<string,unknown>={}
+ if(key==='er') {if(d?.result!=='success'||d.base_code!=='EUR'||!Number.isFinite(d.time_last_update_unix))throw new Error('开放汇率数据格式异常');date=new Date(d.time_last_update_unix*1000).toISOString().slice(0,10);raw=d.rates}
+ else if(key.startsWith('fawaz-')) {date=d?.date;raw=d?.eur}
+ else {
+  if(!d||typeof d!=='object'||Array.isArray(d))throw new Error('FloatRates 数据格式异常')
+  raw={EUR:1}
+  for(const c of CURRENCIES.filter(c=>c.code!=='EUR')){const r=d[c.code.toLowerCase()];if(!r)continue;const t=Date.parse(r.date);if(r.code!==c.code||!Number.isFinite(t))throw new Error('FloatRates 数据格式异常');const rd=new Date(t).toISOString().slice(0,10);if(date&&date!==rd)throw new Error('汇率日期不一致');date=rd;raw[c.code]=typeof r.rate==='string'&&r.rate.trim()?Number(r.rate):r.rate}
+ }
+ if(!raw||typeof raw!=='object')throw new Error('汇率数据格式异常')
+ const rates:Record<string,number>={}
+ for(const c of CURRENCIES){const v=raw[c.code]??raw[c.code.toLowerCase()];if(v!==undefined){if(typeof v!=='number'||!Number.isFinite(v)||v<=0)throw new Error('汇率数据格式异常');rates[c.code]=v}}
+ return validateSnapshot({date,rates})
 }

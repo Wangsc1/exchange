@@ -13,9 +13,8 @@ export function loadTS(file,imports={},globals={}) {
   vm.runInNewContext(output.outputText,context,{filename:file});return {exports,context};
 }
 export const Core=loadTS('core.ts').exports;
-export const Update=loadTS('update.ts',{'./core':Core}).exports;
 // 以下是明确的测试夹具，绝不被生产程序引入或用于离线兜底。
 export const fixture={date:'2026-01-02',rates:{USD:1.2,CNY:8.4,CAD:1.6,EUR:1,GBP:.8,AUD:1.8,JPY:160,CHF:.95}};
 export const plain=value=>JSON.parse(JSON.stringify(value));
 export function fakeStorage(initial={}) {const data=new Map(Object.entries(initial));return {get:k=>data.has(k)?data.get(k):null,set:(k,v)=>{data.set(k,v);return true;},remove:k=>data.delete(k),data};}
-export function service(storage,request){return loadTS('service.ts',{'./core':Core,'./update':Update,scripting:{fetch:request,Script:{directory:'/手机脚本'}}},{Storage:storage,FileManager:{}}).exports;}
+export function service(storage,request){return loadTS('service.ts',{'./core':Core,scripting:{fetch:request,Script:{directory:'/手机脚本'}}},{Storage:storage,FileManager:{}}).exports;}

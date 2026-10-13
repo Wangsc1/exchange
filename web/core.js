@@ -2,7 +2,7 @@
 const Core = (() => { const exports = {};
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.VERSION = exports.PERIODS = exports.CURRENCIES = exports.DEFAULT_CODES = void 0;
+exports.SOURCES = exports.VERSION = exports.PERIODS = exports.CURRENCIES = exports.DEFAULT_CODES = void 0;
 exports.flag = flag;
 exports.search = search;
 exports.validDate = validDate;
@@ -18,10 +18,11 @@ exports.historyRange = historyRange;
 exports.parseHistory = parseHistory;
 exports.statistics = statistics;
 exports.cached = cached;
-exports.newer = newer;
 exports.parseYahoo = parseYahoo;
 exports.crossIntraday = crossIntraday;
 exports.validateIntraday = validateIntraday;
+exports.normalizeSettings = normalizeSettings;
+exports.parseSource = parseSource;
 exports.DEFAULT_CODES = ['USD', 'CNY', 'CAD', 'EUR', 'GBP', 'AUD'];
 // 当前 ECB 常规发布的法币；没有行情的币种不会出现在选择列表中。
 exports.CURRENCIES = [
@@ -169,12 +170,7 @@ async function cached(store, key, load, validate) {
         }
     }
 }
-exports.VERSION = '1.0.15';
-function newer(remote, local) { if (!/^\d+\.\d+\.\d+$/.test(remote) || !/^\d+\.\d+\.\d+$/.test(local))
-    throw new Error('版本格式无效'); const a = remote.split('.').map(Number), b = local.split('.').map(Number); for (let i = 0; i < 3; i++) {
-    if (a[i] !== b[i])
-        return a[i] > b[i];
-} return false; }
+exports.VERSION = '1.1.0';
 function parseYahoo(data) {
     const r = data?.chart?.result?.[0];
     const ts = r?.timestamp, close = r?.indicators?.quote?.[0]?.close;
@@ -214,6 +210,71 @@ function validateIntraday(value, base, quote) {
         throw new Error('日内缓存损坏');
     return value.map(r => { if (!r || r.base !== base || r.quote !== quote || !Number.isFinite(Date.parse(r.date)) || !Number.isFinite(r.rate) || r.rate <= 0)
         throw new Error('日内缓存损坏'); return { date: r.date, base, quote, rate: r.rate }; });
+}
+exports.SOURCES = [
+    { key: 'ecb', name: 'Frankfurter · 欧洲央行 ECB', description: '欧洲央行参考汇率，工作日更新', url: 'https://api.frankfurter.dev/v2/rates?providers=ECB&base=EUR', cache: 'rates.ecb.v2' },
+    { key: 'boc', name: 'Frankfurter · 加拿大央行 BOC', description: '加拿大央行指示汇率，工作日更新；交叉换算', url: 'https://api.frankfurter.dev/v2/rates?providers=BOC&base=EUR', cache: 'rates.boc.v1' },
+    { key: 'er', name: 'ExchangeRate-API', description: '开放参考汇率，每日更新', url: 'https://open.er-api.com/v6/latest/EUR', cache: 'rates.er.v1' },
+    { key: 'fawaz-cdn', name: '开源汇率 · jsDelivr', description: 'fawazahmed0 每日数据，CDN 日期可能滞后', url: 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/eur.json', cache: 'rates.fawaz-cdn.v1' },
+    { key: 'fawaz-pages', name: '开源汇率 · Cloudflare', description: 'fawazahmed0 每日数据', url: 'https://latest.currency-api.pages.dev/v1/currencies/eur.json', cache: 'rates.fawaz-pages.v1' },
+    { key: 'float', name: 'FloatRates', description: '综合参考汇率，约每12小时更新', url: 'https://www.floatrates.com/daily/eur.json', cache: 'rates.float.v1' }
+];
+function normalizeSettings(value) {
+    const v = value;
+    if (!v || typeof v.symbols !== 'boolean' || typeof v.showSource !== 'boolean' || !exports.SOURCES.some(s => s.key === v.source) || ![1, 10, 100, 1000, 10000].includes(v.defaultAmount) || !Number.isInteger(v.decimals) || v.decimals < 0 || v.decimals > 8)
+        return { symbols: true, showSource: true, source: 'ecb', defaultAmount: 100, decimals: 2 };
+    return { symbols: v.symbols, showSource: v.showSource, source: v.source, defaultAmount: v.defaultAmount, decimals: v.decimals };
+}
+function parseSource(key, data) {
+    if (!exports.SOURCES.some(s => s.key === key))
+        throw new Error('未知汇率源');
+    const d = data;
+    if (key === 'ecb' || key === 'boc') {
+        if (!Array.isArray(d))
+            throw new Error('汇率数据格式异常');
+        return parseLatest(d.filter((r) => exports.CURRENCIES.some(c => c.code === r?.quote)));
+    }
+    let date = '', raw = {};
+    if (key === 'er') {
+        if (d?.result !== 'success' || d.base_code !== 'EUR' || !Number.isFinite(d.time_last_update_unix))
+            throw new Error('开放汇率数据格式异常');
+        date = new Date(d.time_last_update_unix * 1000).toISOString().slice(0, 10);
+        raw = d.rates;
+    }
+    else if (key.startsWith('fawaz-')) {
+        date = d?.date;
+        raw = d?.eur;
+    }
+    else {
+        if (!d || typeof d !== 'object' || Array.isArray(d))
+            throw new Error('FloatRates 数据格式异常');
+        raw = { EUR: 1 };
+        for (const c of exports.CURRENCIES.filter(c => c.code !== 'EUR')) {
+            const r = d[c.code.toLowerCase()];
+            if (!r)
+                continue;
+            const t = Date.parse(r.date);
+            if (r.code !== c.code || !Number.isFinite(t))
+                throw new Error('FloatRates 数据格式异常');
+            const rd = new Date(t).toISOString().slice(0, 10);
+            if (date && date !== rd)
+                throw new Error('汇率日期不一致');
+            date = rd;
+            raw[c.code] = typeof r.rate === 'string' && r.rate.trim() ? Number(r.rate) : r.rate;
+        }
+    }
+    if (!raw || typeof raw !== 'object')
+        throw new Error('汇率数据格式异常');
+    const rates = {};
+    for (const c of exports.CURRENCIES) {
+        const v = raw[c.code] ?? raw[c.code.toLowerCase()];
+        if (v !== undefined) {
+            if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0)
+                throw new Error('汇率数据格式异常');
+            rates[c.code] = v;
+        }
+    }
+    return validateSnapshot({ date, rates });
 }
 
 return exports; })();

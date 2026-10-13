@@ -1,6 +1,7 @@
 /* 本地界面；所有网络与持久化操作通过官方 Promise 消息桥完成。 */
 'use strict';
 const $ = id => document.getElementById(id);
+let settings = Core.normalizeSettings(null), fetchedAt = null, refreshToken = 0, settingsSaving = false;
 let config = Core.normalizeConfig(null), snapshot = null, expr = '100', fresh = true;
 let offline = false, warning = '', busy = false, page = 'home', toastTimer, saveQueue = Promise.resolve();
 let selection = null, detailBase = 'CNY', detailQuote = 'USD', detailAmount = 100, period = 1, historyToken = 0;
@@ -23,11 +24,11 @@ const entryDir = {};
 function show(target, dir = 'right') {
   const leaving = page;
   if (dir === 'back') dir = entryDir[leaving] === 'right' ? 'left' : 'right'; else entryDir[target] = dir;
-  page = target; for (const id of ['home', 'detail', 'selector']) $(id).classList.toggle('hidden', id !== target);
+  page = target; for (const id of ['home', 'detail', 'selector', 'menu', 'choices']) $(id).classList.toggle('hidden', id !== target);
   const el = $(target); el.classList.remove('enterLeft', 'enterRight'); void el.offsetWidth; el.classList.add(dir === 'left' ? 'enterLeft' : 'enterRight');
 }
 function numberText(n) { return n.toLocaleString('en-US', { useGrouping: false, maximumSignificantDigits: 15 }); }
-function formatted(n) { return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: Math.abs(n) < 0.01 && n !== 0 ? 6 : 2 }); }
+function formatted(n) { return n.toLocaleString('en-US', { minimumFractionDigits: settings.decimals, maximumFractionDigits: settings.decimals }); }
 function persist() {
   const value = { codes: [...config.codes], base: config.base, amount: config.amount };
   saveQueue = saveQueue.catch(() => {}).then(() => bridge('save', value)).catch(e => toast(e.message));
@@ -46,7 +47,7 @@ function renderRows() {
     const amounts = element('div', undefined, 'amounts');
     let amount = code === config.base ? config.amount : null;
     try { if (snapshot) amount = Core.convert(config.amount, config.base, code, snapshot); } catch { /* 没有行情的行显示破折号，不合成汇率。 */ }
-    amounts.append(element('div', code === config.base ? expr : amount === null ? '—' : formatted(amount), 'amount'), element('div', `${c.name} ${c.symbol}`, 'name'));
+    amounts.append(element('div', code === config.base ? expr : amount === null ? '—' : formatted(amount), 'amount'), element('div', `${c.name}${settings.symbols ? ' ' + c.symbol : ''}`, 'name'));
     content.append(amounts); content.setAttribute('aria-label', `${c.name} ${amount === null ? '暂无数据' : numberText(amount)}，点击作为输入基准；左右滑动打开操作`);
     let startX = 0, startY = 0, startOffset = 0, offset = 0, moving = false, dragged = false;
     // 内容跟手位移；左右操作面板宽度等于已露出的宽度，因此可一直滑到底。animate=true 时使用回弹曲线。
@@ -80,21 +81,25 @@ function renderRows() {
       if (dragged) { dragged = false; return; }
       if (offset) { offset = 0; setOffset(0, true); return; }
       if (!snapshot) return toast('请先刷新取得汇率');
-      try { config = { ...config, base: code, amount: 100 }; expr = '100'; fresh = true; persist(); render(); } catch (e) { toast(e.message); }
+      try { config = { ...config, base: code, amount: settings.defaultAmount }; expr = numberText(settings.defaultAmount); fresh = true; persist(); render(); } catch (e) { toast(e.message); }
     };
     row.append(swap, info, content); $('rows').append(row);
   });
 }
 function render() {
   renderRows(); $('expression').textContent = `${expr} ${config.base}`;
-  $('source').textContent = snapshot ? `Frankfurter · ECB | ${snapshot.date} · 工作日日更 · 仅供参考${offline ? ' | 离线缓存' : ''}${warning ? ' | ' + warning : ''}` : `Frankfurter · ECB | ${warning ? '取数失败：' + warning : '暂无数据，请联网刷新'}（仅供参考）`;
+  const src = Core.SOURCES.find(s => s.key === settings.source);
+  $('source').classList.toggle('hidden', !settings.showSource);
+  $('source').textContent = `${src.name} | ${snapshot ? snapshot.date : '暂无数据'} · ${src.description} · 仅供参考${offline ? ' | 离线缓存' : ''}${warning ? ' | ' + warning : ''}`;
 }
 async function refresh() {
-  if (busy) return; busy = true;
-  try { const r = await bridge('latest'); snapshot = Core.validateSnapshot(r.value); offline = r.offline; warning = r.warning; if (warning) toast(warning); }
-  catch (e) { warning = e.message; toast(e.message); }
-  finally { busy = false; render(); }
+  const token = ++refreshToken, key = settings.source; busy = true;
+  snapshot = null; warning = ''; render();
+  try { const r = await bridge('latest', key); if(token !== refreshToken)return; snapshot = Core.validateSnapshot(r.value); offline = r.offline; warning = r.warning; fetchedAt = r.fetchedAt || null; if (warning) toast(warning); }
+  catch (e) { if(token !== refreshToken)return; warning = e.message; toast(e.message); }
+  finally { if(token === refreshToken){busy = false; render(); renderSettings();} }
 }
+
 function input(key) {
   if (key === '=') { try { config.amount = Core.calculate(expr); expr = numberText(config.amount); fresh = true; persist(); render(); } catch (e) { toast(e.message); } return; }
   if (fresh && /^[0-9.]$/.test(key)) expr = '0';
@@ -152,7 +157,7 @@ function renderSelector() {
       b.onclick = () => {
         try {
           if (selection.kind === 'row') { config = Core.replaceCurrency(config, selection.index, c.code, snapshot); expr = numberText(config.amount); fresh = true; persist(); render(); }
-          else if (selection.kind === 'base') { detailAmount = 100; detailBase = c.code; }
+          else if (selection.kind === 'base') { detailAmount = settings.defaultAmount; detailBase = c.code; }
           else detailQuote = c.code;
           show(selection.back, 'back'); if (selection.back === 'detail') renderDetail();
         } catch (e) { toast(e.message); }
@@ -167,7 +172,7 @@ function dismissSelector() { $('letterIndex').classList.add('hidden'); $('letter
 $('selectorBack').onclick = dismissSelector;
 function openDetail(code) {
   if (!snapshot) return toast('请先取得汇率');
-  try { detailBase = code; detailAmount = 100; detailQuote = code === 'USD' ? 'CNY' : 'USD'; show('detail', 'right'); renderDetail(); } catch (e) { toast(e.message); }
+  try { detailBase = code; detailAmount = settings.defaultAmount; detailQuote = code === 'USD' ? 'CNY' : 'USD'; show('detail', 'right'); renderDetail(); } catch (e) { toast(e.message); }
 }
 function renderDetail() {
   const base = currency(detailBase), quote = currency(detailQuote); $('pair').replaceChildren();
@@ -177,6 +182,7 @@ function renderDetail() {
   $('bigAmount').textContent = formatted(Core.convert(detailAmount, detailBase, detailQuote, snapshot));
   $('periods').replaceChildren();
   Core.PERIODS.forEach(p => { const button = element('button',p.label,p.days === period ? 'active' : ''); button.onclick = () => { period = p.days; renderDetail(); }; $('periods').append(button); });
+  $('detailSource').textContent = `换算来源：${Core.SOURCES.find(s=>s.key===settings.source).name}；${snapshot.date}。历史走势：ECB（1月及以上）；24时/7天：Yahoo Finance 非官方日内行情。仅供参考，非交易或银行报价。`;
   loadHistory();
 }
 function timeLabel(date) { if (date.length <= 10) return date; const d = new Date(date), p = n => String(n).padStart(2, '0'); return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; }
@@ -192,7 +198,7 @@ async function loadHistory() {
       result = await bridge('history', { base, quote, days: period, end: snapshot.date }); if (token !== historyToken) return;
       const range = Core.historyRange(snapshot.date, period); records = Core.parseHistory(result.value, base, quote, range.from, range.to);
     }
-    const stats = Core.statistics(records), scale = detailAmount, fixed = v => (v * scale).toFixed(4);
+    const stats = Core.statistics(records), scale = detailAmount, fixed = v => formatted(v * scale);
     $('historyStatus').textContent = [result.offline ? '离线缓存' : '', result.warning || ''].filter(Boolean).join(' · ');
     chart(records, stats); $('chartDates').append(element('span', timeLabel(records[0].date)), element('span', timeLabel(records[records.length - 1].date)));
     [['最高', stats.high], ['最低', stats.low], ['平均', stats.average], ['涨跌', stats.change]].forEach(([label, value]) => { const box = element('div'); box.append(element('label', label), element('strong', label === '涨跌' ? `${value >= 0 ? '+' : ''}${value.toFixed(4)}%` : fixed(value))); $('stats').append(box); });
@@ -210,7 +216,7 @@ function chart(records,stats) {
   const title=svg('title',{});title.textContent=`${records[0].base}兑${records[0].quote}，${records[0].date}至${records[records.length-1].date}，最低${stats.low}，最高${stats.high}`;$('chart').prepend(title);
 }
 $('detailBack').onclick = () => { historyToken++; show('home', 'back'); };
-async function start(){render();try{config=Core.normalizeConfig(await bridge('config'));expr=numberText(config.amount);render();}catch(e){toast(e.message);}await refresh();}
+async function start(){render();try{config=Core.normalizeConfig(await bridge('config'));settings=Core.normalizeSettings(await bridge('settings'));expr=numberText(config.amount);render();}catch(e){toast(e.message);}await refresh();}
 start();
 // 每次进入都自动刷新：启动时一次；App 从后台回到前台时再刷新（距上次成功刷新超过 20 秒，避免频繁请求）。
 let lastRefresh = Date.now();
@@ -219,8 +225,44 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
 // 子页面支持从屏幕左边缘向右滑返回；命中区为左边缘 28px，水平位移超过 70px 且大于竖向位移时触发。
 {
   let sx = 0, sy = 0, tracking = false;
-  const back = () => { if (page === 'detail') $('detailBack').click(); else if (page === 'selector') $('selectorBack').click(); };
+  const back = () => { if (page === 'detail') $('detailBack').click(); else if (page === 'selector') $('selectorBack').click(); else if (page === 'menu') $('menuBack').click(); else if (page === 'choices') $('choicesBack').click(); };
   document.addEventListener('touchstart', e => { const t = e.touches[0]; tracking = page !== 'home' && e.touches.length === 1 && t.clientX <= 28; sx = t.clientX; sy = t.clientY; }, { passive: true });
   document.addEventListener('touchend', e => { if (!tracking) return; tracking = false; const t = e.changedTouches[0], dx = t.clientX - sx, dy = Math.abs(t.clientY - sy); if (dx > 70 && dx > dy * 1.5) back(); }, { passive: true });
   document.addEventListener('touchcancel', () => { tracking = false; }, { passive: true });
 }
+
+function updatedText() {
+ if(!fetchedAt)return '上次更新 暂无成功记录';
+ const d=new Date(fetchedAt),now=new Date(),yesterday=new Date(now);yesterday.setDate(now.getDate()-1);
+ const day=d.toDateString()===now.toDateString()?'今天':d.toDateString()===yesterday.toDateString()?'昨天':`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+ return `上次更新 ${day}${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+function renderSettings(){
+ $('lastUpdated').textContent=updatedText();$('version').textContent='汇率 版本 '+Core.VERSION;
+ const box=$('settingRows');box.replaceChildren();
+ for(const [field,label] of [['symbols','货币符号'],['showSource','显示换算汇率源']]){
+  const b=element('button',undefined,'settingRow');b.id=field;b.setAttribute('role','switch');b.setAttribute('aria-checked',String(settings[field]));
+  b.append(element('span',label),element('span',settings[field]?'开启':'关闭','toggle '+(settings[field]?'on':'')));
+  b.onclick=()=>updateSettings(field,!settings[field]);box.append(b);
+ }
+ for(const [field,label,value] of [['source','换算汇率源',Core.SOURCES.find(s=>s.key===settings.source).name],['defaultAmount','货币默认值',settings.defaultAmount.toLocaleString('en-US')],['decimals','小数点位数',settings.decimals+' 位']]){
+  const b=element('button',undefined,'settingRow');b.id='setting-'+field;b.append(element('span',label),element('span',value+' ›','muted'));b.onclick=()=>openChoices(field,label);box.append(b);
+ }
+}
+async function updateSettings(field,value){
+ if(settingsSaving)return;settingsSaving=true;
+ const buttons=[...document.querySelectorAll('#settingRows button, #choiceRows button')];buttons.forEach(b=>b.disabled=true);
+ const next={...settings,[field]:value};
+ try{await bridge('saveSettings',next);settings=Core.normalizeSettings(next);renderSettings();render();if(field==='source'){show('menu','back');fetchedAt=null;await refresh();}else if(page==='choices')show('menu','back');}
+ catch(e){toast(e.message);}
+ finally{settingsSaving=false;buttons.forEach(b=>b.disabled=false);}
+}
+function openChoices(field,title){
+ $('choiceTitle').textContent=title;const box=$('choiceRows');box.replaceChildren();
+ const items=field==='source'?Core.SOURCES.map(s=>[s.key,s.name,s.description]):(field==='defaultAmount'?[1,10,100,1000,10000]:[0,1,2,3,4,5,6,7,8]).map(v=>[v,v.toLocaleString('en-US')+(field==='decimals'?' 位':''),'']);
+ for(const [value,label,desc] of items){const b=element('button',undefined,'currency');b.setAttribute('role','radio');b.setAttribute('aria-checked',String(settings[field]===value));const labels=element('span',undefined,'labels');labels.append(element('span',label));if(desc)labels.append(element('small',desc));b.append(labels,element('span',settings[field]===value?'✓':'','check'));b.onclick=()=>updateSettings(field,value);box.append(b);}
+ box.setAttribute('role','radiogroup');box.setAttribute('aria-label',title);show('choices');
+}
+$('settings').onclick=()=>{renderSettings();show('menu');};
+$('menuBack').onclick=()=>show('home','back');$('choicesBack').onclick=()=>show('menu','back');
+$('resetCurrencies').onclick=()=>{if(!confirm('恢复默认币种列表？将恢复 USD、CNY、CAD、EUR、GBP、AUD，并以人民币为基准。'))return;config={codes:[...Core.DEFAULT_CODES],base:'CNY',amount:settings.defaultAmount};expr=numberText(config.amount);fresh=true;persist();render();toast('已恢复默认币种列表');};

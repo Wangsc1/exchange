@@ -13,11 +13,11 @@ async function run(){
         switch(message?.action){
           case 'config':value=Service.readConfig();break
           case 'save':value=Service.saveConfig(message.value);break
-          case 'latest':value=await Service.latest();break
+          case 'latest':value=await Service.latest(message.value as string | undefined);break
+          case 'settings':value=Service.readSettings();break
+          case 'saveSettings':value=Service.saveSettings(message.value);break
           case 'history':value=await Service.history(message.value as Parameters<typeof Service.history>[0]);break
           case 'intraday':value=await Service.intraday(message.value as Parameters<typeof Service.intraday>[0]);break
-          case 'checkUpdate':value=await Service.checkUpdate();break
-          case 'update':value=await Service.update();break
           case 'close':setTimeout(()=>controller.dismiss(),0);value=true;break
           default:throw new Error('不支持的操作')
         }
