@@ -181,7 +181,7 @@ async function loadHistory() {
       const range = Core.historyRange(snapshot.date, period); records = Core.parseHistory(result.value, base, quote, range.from, range.to);
     }
     const stats = Core.statistics(records), scale = detailAmount, fixed = v => (v * scale).toFixed(4);
-    $('historyStatus').textContent = `${records.length} 个${selected.intraday ? '行情点 · Yahoo Finance 市场行情' : '实际日记录 · ECB 参考汇率'}${result.offline ? ' · 离线缓存' : ''}${result.warning ? ' · ' + result.warning : ''}`;
+    $('historyStatus').textContent = [result.offline ? '离线缓存' : '', result.warning || ''].filter(Boolean).join(' · ');
     chart(records, stats); $('chartDates').append(element('span', timeLabel(records[0].date)), element('span', timeLabel(records[records.length - 1].date)));
     [['最高', stats.high], ['最低', stats.low], ['平均', stats.average], ['涨跌', stats.change]].forEach(([label, value]) => { const box = element('div'); box.append(element('label', label), element('strong', label === '涨跌' ? `${value >= 0 ? '+' : ''}${value.toFixed(4)}%` : fixed(value))); $('stats').append(box); });
   } catch (e) { if (token === historyToken) $('historyStatus').textContent = e.message; }

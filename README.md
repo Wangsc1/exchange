@@ -27,6 +27,10 @@
 
 旗帜采用系统旗帜 emoji；具体字形、Safe Area 和宿主是否保留导航区域须以 iPhone 实际显示为准。
 
+## 字体
+
+界面数字和文字使用内嵌的开源 **Barlow**（SIL Open Font License 1.1，许可全文见 `FONT-LICENSE-Barlow-OFL.txt`）细体/常规体，字形接近参考截图的 DIN 风格数字；以 base64 内嵌在 `web/style.css`，不依赖网络字体。中文使用 iPhone 系统字体（苹方）。
+
 ## 真实数据与历史口径
 
 2026-10-13 核验的 Frankfurter **现行官方 API 为 v2**，无需 API Key。虽然 v2 支持多个来源，本工具固定 `providers=ECB`（欧洲央行），避免把来源不同的汇率混合成不清楚的报价。
@@ -119,6 +123,7 @@ node scripts/check.mjs /绝对路径/官方类型声明目录
 ## 文件结构
 
 ```text
+FONT-LICENSE-Barlow-OFL.txt  内嵌字体许可
 script.json             脚本元数据（App名称：汇率）
 index.tsx               原生入口、桥接、生命周期
 core.ts                 业务算法与校验

@@ -91,7 +91,7 @@ export async function cached<T>(store:CacheStore,key:string,load:()=>Promise<unk
   try {const value=validate(await load()); const saved=store.set(key,value); return {value,offline:false,warning:saved?'':'缓存保存失败，下次离线可能不可用'}}
   catch(e) {try{return {value:validate(store.get(key)),offline:true,warning:`连接失败，使用缓存：${e instanceof Error?e.message:'未知错误'}`}}catch{throw new Error(`无法取得数据且没有可用缓存：${e instanceof Error?e.message:'未知错误'}`)}}
 }
-export const VERSION='1.0.8'
+export const VERSION='1.0.9'
 export function newer(remote:string,local:string) {if(!/^\d+\.\d+\.\d+$/.test(remote)||!/^\d+\.\d+\.\d+$/.test(local))throw new Error('版本格式无效');const a=remote.split('.').map(Number),b=local.split('.').map(Number);for(let i=0;i<3;i++){if(a[i]!==b[i])return a[i]>b[i]}return false}
 
 // ---- 24时/7天：日内行情（Yahoo Finance 非官方图表接口），以 USD 为中间腿交叉计算 ----
