@@ -227,3 +227,12 @@ $('install').onclick = async () => {
 };
 async function start(){render();try{config=Core.normalizeConfig(await bridge('config'));expr=numberText(config.amount);render();}catch(e){toast(e.message);}await refresh();}
 start();
+
+// 子页面支持从屏幕左边缘向右滑返回；命中区为左边缘 28px，水平位移超过 70px 且大于竖向位移时触发。
+{
+  let sx = 0, sy = 0, tracking = false;
+  const back = () => { if (page === 'detail') $('detailBack').click(); else if (page === 'selector') $('selectorBack').click(); else if (page === 'menu') $('menuBack').click(); };
+  document.addEventListener('touchstart', e => { const t = e.touches[0]; tracking = page !== 'home' && e.touches.length === 1 && t.clientX <= 28; sx = t.clientX; sy = t.clientY; }, { passive: true });
+  document.addEventListener('touchend', e => { if (!tracking) return; tracking = false; const t = e.changedTouches[0], dx = t.clientX - sx, dy = Math.abs(t.clientY - sy); if (dx > 70 && dx > dy * 1.5) back(); }, { passive: true });
+  document.addEventListener('touchcancel', () => { tracking = false; }, { passive: true });
+}

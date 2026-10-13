@@ -1,5 +1,5 @@
 {
-  "version": "1.0.11",
-  "notes": "修复右滑时误露出青色详情面板的问题；行复位不再过冲。",
+  "version": "1.0.12",
+  "notes": "放大返回按钮点击区域，并支持左边缘右滑返回。",
   "files": ["index.tsx", "core.ts", "service.ts", "update.ts", "web/index.html", "web/style.css", "web/ui.js", "web/core.js"]
 }

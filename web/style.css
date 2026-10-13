@@ -11,3 +11,8 @@
 body,button,input{font-family:"DinLike",-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif}.code{letter-spacing:.02em}.amount,#bigAmount,#stats strong,.expression,#keyboard button{font-weight:300}h1,.code,.name,.muted{font-weight:400}
 
 body{overflow-x:hidden}.enterRight{animation:pageInRight .5s cubic-bezier(.34,1.35,.64,1)}.enterLeft{animation:pageInLeft .5s cubic-bezier(.34,1.35,.64,1)}@keyframes pageInRight{from{transform:translateX(100%)}to{transform:none}}@keyframes pageInLeft{from{transform:translateX(-100%)}to{transform:none}}@media(prefers-reduced-motion:reduce){.enterRight,.enterLeft{animation:none}.swipe{transition:none}}
+
+#detailBack,#selectorBack,#menuBack{min-width:88px;min-height:52px;margin:-4px 0 -4px -16px;padding:0 16px;text-align:left;display:flex;align-items:center;font-size:17px;touch-action:manipulation}
+#detailBack:active,#selectorBack:active,#menuBack:active{opacity:.55}
+.headerSpacer{width:88px}
+.enterRight,.enterLeft{animation-duration:.38s}
