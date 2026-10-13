@@ -66,12 +66,12 @@ function renderRows() {
     content.onpointerup = () => {
       if (moving) {
         const w = row.clientWidth;
-        if (Math.abs(offset) >= w * 0.8) {
-          // 滑到底：先停在底部，页面以回弹动画进入；行随后弹回原位。
+        if (Math.abs(offset) >= w * 0.5) {
+          // 超过一半：自动进入对应页面（页面回弹进入），行随后弹回原位。
           const action = offset > 0 ? () => openSelector({ kind: 'row', index, back: 'home' }, 'left') : () => openDetail(code);
           offset = 0; moving = false; action(); setOffset(0, true); return;
         }
-        offset = Math.abs(offset) > 45 ? Math.sign(offset) * (w / 2) : 0; setOffset(offset, true);
+        offset = 0; setOffset(0, true); // 未过半：不停留半开状态，直接弹回
       }
       moving = false;
     };
