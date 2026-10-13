@@ -22,17 +22,6 @@ function bridge(action, value) {
 function toast(message) { $('toast').textContent = message; $('toast').classList.remove('hidden'); clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').classList.add('hidden'), 5500); }
 const PAGE_IDS=['home','detail','selector','menu','choices','decimalSettings','decimalChoices'];
 let choiceField='source', choiceTitle='换算汇率源', needsRefresh=false;
-function sharedState(){return {config,settings,snapshot,expr,fresh,edited,offline,warning,fetchedAt,selection,detailBase,detailQuote,detailAmount,period,choiceField,choiceTitle,needsRefresh};}
-function publish(){return bridge('state',sharedState()).catch(()=>{});}
-function adopt(value){
- if(!value)return;
- config=Core.normalizeConfig(value.config);settings=Core.normalizeSettings(value.settings);
- snapshot=value.snapshot?Core.validateSnapshot(value.snapshot):null;
- expr=typeof value.expr==='string'?value.expr:numberText(config.amount);fresh=value.fresh!==false;edited=!!value.edited;
- offline=!!value.offline;warning=value.warning||'';fetchedAt=value.fetchedAt||null;
- selection=value.selection||null;detailBase=value.detailBase||'CNY';detailQuote=value.detailQuote||'USD';detailAmount=value.detailAmount??settings.defaultAmount;period=value.period||1;
- choiceField=value.choiceField||'source';choiceTitle=value.choiceTitle||'换算汇率源';needsRefresh=!!value.needsRefresh;
-}
 function mount(){
  for(const id of PAGE_IDS)$(id).classList.toggle('hidden',id!==page);
  render();
@@ -44,15 +33,30 @@ function mount(){
  if(page==='decimalChoices')renderDecimalChoices();
  if(needsRefresh&&(page==='menu'||page==='home')){needsRefresh=false;refresh();}
 }
-// 原生 pop/appear 后采用会话状态；无自绘页面transform，不参与系统交互手势。
-window.__exchangeResume=value=>{refreshToken++;historyToken++;busy=false;adopt(value);if(!snapshot&&(page==='home'||page==='menu'))needsRefresh=true;mount();};
+// 1.2.1 临时恢复：单网页页面栈与自定义边缘返回，不是系统原生导航。
+const pageStack=[],entryDir={};
 function show(target,dir='right'){
- saveQueue.catch(()=>{}).then(()=>bridge('navigate',{page:target,back:dir==='back',state:{...sharedState(),needsRefresh:needsRefresh||(!snapshot&&(target==='menu'||target==='home'))}})).catch(e=>toast(e.message));
+ const leaving=page;
+ historyToken++;
+ if(dir==='back'){target=pageStack.pop()||target||'home';dir=entryDir[leaving]==='right'?'left':'right';}
+ else{pageStack.push(leaving);entryDir[target]=dir;}
+ page=target;mount();
+ for(const id of PAGE_IDS)$(id).classList.remove('enterLeft','enterRight');
+ // 设置相关页面不叠加回弹，只在三个主页面之间保留原进入动画。
+ if(['home','detail','selector'].includes(leaving)&&['home','detail','selector'].includes(target)){
+  void $(target).offsetWidth;$(target).classList.add(dir==='left'?'enterLeft':'enterRight');
+ }
+}
+function backPage(){if(pageStack.length)show(pageStack[pageStack.length-1],'back');}
+{
+ let sx=0,sy=0,tracking=false;
+ document.addEventListener('touchstart',e=>{const t=e.touches[0];tracking=page!=='home'&&e.touches.length===1&&t.clientX<=28;sx=t.clientX;sy=t.clientY;},{passive:true});
+ document.addEventListener('touchend',e=>{if(!tracking)return;tracking=false;const t=e.changedTouches[0],dx=t.clientX-sx,dy=Math.abs(t.clientY-sy);if(dx>70&&dx>dy*1.5)backPage();},{passive:true});
+ document.addEventListener('touchcancel',()=>{tracking=false;},{passive:true});
 }
 function numberText(n) { return n.toLocaleString('en-US', { useGrouping: false, maximumSignificantDigits: 15 }); }
 function formatted(n) { return n.toLocaleString('en-US', { minimumFractionDigits: settings.decimals, maximumFractionDigits: settings.decimals }); }
 function persist() {
-  publish();
   const value = { codes: [...config.codes], base: config.base, amount: config.amount };
   saveQueue = saveQueue.catch(() => {}).then(() => bridge('save', value)).catch(e => toast(e.message));
 }
@@ -121,7 +125,7 @@ async function refresh() {
   snapshot = null; warning = ''; render();
   try { const r = await bridge('latest', key); if(token !== refreshToken)return; snapshot = Core.validateSnapshot(r.value); offline = r.offline; warning = r.warning; fetchedAt = r.fetchedAt || null; if (warning) toast(warning); }
   catch (e) { if(token !== refreshToken)return; warning = e.message; toast(e.message); }
-  finally { if(token === refreshToken){busy = false; render(); renderSettings();publish();} }
+  finally { if(token === refreshToken){busy = false; render(); renderSettings();} }
 }
 
 function restoreDefaultAmount(){config.amount=settings.defaultAmount;expr=numberText(config.amount);fresh=true;edited=false;persist();render();}
@@ -207,7 +211,7 @@ function renderDetail() {
   $('pair').append(b, element('span',' → '), q);
   $('bigAmount').textContent = formatted(Core.convert(detailAmount, detailBase, detailQuote, snapshot));
   $('periods').replaceChildren();
-  Core.PERIODS.forEach(p => { const button = element('button',p.label,p.days === period ? 'active' : ''); button.onclick = () => { period = p.days;publish(); renderDetail(); }; $('periods').append(button); });
+  Core.PERIODS.forEach(p => { const button = element('button',p.label,p.days === period ? 'active' : ''); button.onclick = () => { period = p.days; renderDetail(); }; $('periods').append(button); });
   $('detailSource').textContent = `换算来源：${Core.SOURCES.find(s=>s.key===settings.source).name}；${snapshot.date}。历史走势：ECB（1月及以上）；24时/7天：Yahoo Finance 非官方日内行情。仅供参考，非交易或银行报价。`;
   loadHistory();
 }
@@ -242,8 +246,9 @@ function chart(records,stats) {
   const title=svg('title',{});title.textContent=`${records[0].base}兑${records[0].quote}，${records[0].date}至${records[records.length-1].date}，最低${stats.low}，最高${stats.high}`;$('chart').prepend(title);
 }
 async function start(){
- const boot=window.__exchangeBoot||{page:'home',state:null};page=boot.page;adopt(boot.state);mount();
- if(!boot.state){try{config=Core.normalizeConfig(await bridge('config'));settings=Core.normalizeSettings(await bridge('settings'));expr=numberText(config.amount);mount();}catch(e){toast(e.message);}await refresh();}
+ mount();
+ try{config=Core.normalizeConfig(await bridge('config'));settings=Core.normalizeSettings(await bridge('settings'));expr=numberText(config.amount);mount();}catch(e){toast(e.message);}
+ await refresh();
 }
 start();
 let lastRefresh=Date.now();
@@ -271,8 +276,8 @@ function renderSettings(){
 async function updateSettings(field,value){
  if(settingsSaving)return;settingsSaving=true;
  const buttons=[...document.querySelectorAll('#settingRows button, #choiceRows button, #decimalChoiceRows button')];buttons.forEach(b=>b.disabled=true);
- const next={...settings,[field]:value};
- try{await bridge('saveSettings',next);settings=Core.normalizeSettings(next);renderSettings();render();if(field==='source'){snapshot=null;fetchedAt=null;needsRefresh=true;show('menu','back');}else if(page==='decimalChoices'){show('decimalSettings','back');}else if(page==='choices')show('menu','back');else await publish();}
+ const origin=page,next={...settings,[field]:value};
+ try{await bridge('saveSettings',next);settings=Core.normalizeSettings(next);renderSettings();render();if(field==='source'){snapshot=null;fetchedAt=null;needsRefresh=true;if(page===origin&&origin==='choices')show('menu','back');else{needsRefresh=false;await refresh();if(page==='detail'&&snapshot)renderDetail();}}else if(page===origin&&page==='decimalChoices'){show('decimalSettings','back');}else if(page===origin&&page==='choices')show('menu','back');}
  catch(e){toast(e.message);}
  finally{settingsSaving=false;buttons.forEach(b=>b.disabled=false);}
 }

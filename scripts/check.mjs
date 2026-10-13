@@ -9,7 +9,7 @@ const root=fileURLToPath(new URL('../',import.meta.url));
 const options={noEmit:true,strict:true,target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.Preserve,skipLibCheck:true};
 const official=process.argv[2];
 function declarations(path){if(statSync(path).isFile())return path.endsWith('.d.ts')?[path]:[];return readdirSync(path).flatMap(f=>declarations(path+'/'+f));}
-const files=['core.ts','navigation.ts'];
+const files=['core.ts'];
 if(official)files.push('index.tsx','service.ts');
 const names=files.map(f=>root+f).concat(official?declarations(official):[]);
 if(official&&!names.some(f=>f.endsWith('.d.ts')))throw new Error('指定目录没有官方 .d.ts 文件');

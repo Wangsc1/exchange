@@ -1,11 +1,10 @@
 {
-  "version": "1.2.0",
-  "notes": "迁移原生导航栈，移除自绘返回和边缘手势，隐藏系统返回按钮；仅主页金额数字输入后亮色，AC及退格删空恢复货币默认值和灰色。原生右滑待真机验收。",
+  "version": "1.2.1",
+  "notes": "恢复此前单WebView启动路径，原生导航暂缓；保留设置样式、多源与金额编辑/删空默认值语义；临时网页边缘右滑返回，无自绘返回按钮；增加启动错误诊断。",
   "files": [
     "index.tsx",
     "core.ts",
     "service.ts",
-    "navigation.ts",
     "web/index.html",
     "web/style.css",
     "web/ui.js",

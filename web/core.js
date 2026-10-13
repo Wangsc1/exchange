@@ -170,7 +170,7 @@ async function cached(store, key, load, validate) {
         }
     }
 }
-exports.VERSION = '1.2.0';
+exports.VERSION = '1.2.1';
 function parseYahoo(data) {
     const r = data?.chart?.result?.[0];
     const ts = r?.timestamp, close = r?.indicators?.quote?.[0]?.close;

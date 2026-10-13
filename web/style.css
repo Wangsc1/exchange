@@ -26,3 +26,5 @@ body{overflow-x:hidden}
 
 /* 仅主页金额：手动数字输入后用日夜主文字色，其余字体保持原色。 */
 #home #rows.edited .amount{color:var(--fg)}
+
+.enterRight{animation:pageInRight .38s cubic-bezier(.34,1.35,.64,1)}.enterLeft{animation:pageInLeft .38s cubic-bezier(.34,1.35,.64,1)}@keyframes pageInRight{from{transform:translateX(100%)}to{transform:none}}@keyframes pageInLeft{from{transform:translateX(-100%)}to{transform:none}}@media(prefers-reduced-motion:reduce){.enterRight,.enterLeft{animation:none}}

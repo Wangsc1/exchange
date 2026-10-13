@@ -1,76 +1,58 @@
-import { Script, Navigation, NavigationStack, NavigationDestination, WebView, VStack, Observable } from 'scripting'
+import { Script } from 'scripting'
 import * as Service from './service'
-import { NavigationSession } from './navigation'
-
+// 1.2.1 恢复此前可打开的单 WebView 入口，不依赖原生导航的新增导出。
 async function run(){
- const directory=Script.directory
- const [template,style,core,ui]=await Promise.all(['web/index.html','web/style.css','web/core.js','web/ui.js'].map(file=>FileManager.readAsString(directory+'/'+file)))
- const safe=(s:string)=>s.replace(/<\/script/gi,'<\\/script')
- const encode=(value:unknown)=>JSON.stringify(value).replace(/</g,'\\u003c').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029')
- const path=new Observable<string[]>([])
- const readiness=new Map<WebViewController,Promise<void>>()
- const alive=new Set<WebViewController>()
- let session:NavigationSession
- const request=async(action:string,value:unknown):Promise<unknown>=>{
-  switch(action){
-   case 'config':return Service.readConfig()
-   case 'save':return Service.saveConfig(value)
-   case 'settings':return Service.readSettings()
-   case 'saveSettings':return Service.saveSettings(value)
-   case 'latest':return Service.latest(value as string | undefined)
-   case 'history':return Service.history(value as Parameters<typeof Service.history>[0])
-   case 'intraday':return Service.intraday(value as Parameters<typeof Service.intraday>[0])
-   default:throw new Error('不支持的操作')
-  }
- }
- session=new NavigationSession({
-  create:(id,page,state)=>{
-   const controller=new WebViewController();alive.add(controller)
-   const ready=(async()=>{
-    await controller.addScriptMessageHandler('exchange',(message:{id:number;action:string;value?:unknown})=>{
-     session.handle(id,message.action,message.value).then(value=>({ok:true,value}),e=>({ok:false,error:e instanceof Error?e.message:'未知错误'})).then(result=>{
-      // 已弹出/退出的控制器不能再收到异步回调；非活跃页面也不能覆盖会话。
-      if(alive.has(controller)&&session.isActive(id))return controller.evaluateJavaScript(`window.__exchangeReply(${encode({id:message.id,...result})})`).catch(()=>undefined)
-     })
-     return true
-    })
-    if(!alive.has(controller))return
-    const boot=`window.__exchangeBoot=${encode({page,state})};`
-    const html=template.replace('/* 样式入口 */',()=>style).replace('/* 业务入口 */',()=>safe(core)).replace('/* 界面入口 */',()=>safe(boot+ui))
-    if(!await controller.loadHTML(html))throw new Error('本地页面加载失败')
-   })()
-   readiness.set(controller,ready);ready.catch(e=>{
-    if(id!=='root'&&session.isActive(id)){
-     const state={...session.state,warning:e instanceof Error?e.message:'页面加载失败'};
-     session.handle(id,'navigate',{page:'home',back:true,state}).catch(()=>undefined);
-    }
-   });return controller
-  },
-  dispose:c=>{const controller=c as WebViewController;if(alive.delete(controller)){controller.dispose();readiness.delete(controller)}},
-  sync:async(c,state)=>{const controller=c as WebViewController;await readiness.get(controller);if(alive.has(controller)&&session.pages.get(session.activeId)?.controller===controller&&state!==null)return controller.evaluateJavaScript(`window.__exchangeResume(${encode(state)})`)},
-  setPath:ids=>path.setValue(ids),request
- },{config:Service.readConfig(),settings:Service.readSettings(),snapshot:null,needsRefresh:true})
- const changed=(ids:string[])=>session.reconcile(ids)
- path.subscribe(changed)
- function Screen({id}:{id:string}){
-  const record=session.pages.get(id)
-  if(!record)return <VStack/>
-  return <WebView controller={record.controller as WebViewController}
-   navigationBarBackButtonHidden={true}
-   frame={{maxWidth:'infinity',maxHeight:'infinity'}}
-   onAppear={()=>session.appear(id)} />
- }
- function App(){
-  return <NavigationStack path={path}>
-   <VStack frame={{maxWidth:'infinity',maxHeight:'infinity'}} navigationBarBackButtonHidden={true}
-    navigationDestination={<NavigationDestination>{(id)=><Screen id={id}/>}</NavigationDestination>}>
-    <Screen id="root"/>
-   </VStack>
-  </NavigationStack>
+ let controller:WebViewController|undefined
+ let closed=false,stage='创建 WebView'
+ async function startup<T>(operation:Promise<T>):Promise<T>{
+  let timer:ReturnType<typeof setTimeout>|undefined
+  try{return await Promise.race([operation,new Promise<never>((_,reject)=>{timer=setTimeout(()=>reject(new Error('启动步骤等待超过30秒')),30000)})])}
+  finally{if(timer)clearTimeout(timer)}
  }
  try {
-  await readiness.get(session.pages.get('root')!.controller as WebViewController)
-  await Navigation.present({element:<App/>})
- }finally{path.unsubscribe(changed);session.dispose();path.dispose()}
+  controller=new WebViewController()
+  const view=controller
+  const reply=(payload:unknown)=>{
+   if(closed)return Promise.resolve()
+   return view.evaluateJavaScript(`window.__exchangeReply(${JSON.stringify(payload).replace(/</g,'\\u003c').replace(/\u2028/g,'\\u2028').replace(/\u2029/g,'\\u2029')})`).catch(()=>undefined)
+  }
+  const handle=async(message:{id:number;action:string;value?:unknown})=>{
+   if(closed)return {ok:false,error:'页面已关闭'}
+   try {
+    let value:unknown
+    switch(message?.action){
+     case 'config':value=Service.readConfig();break
+     case 'save':value=Service.saveConfig(message.value);break
+     case 'settings':value=Service.readSettings();break
+     case 'saveSettings':value=Service.saveSettings(message.value);break
+     case 'latest':value=await Service.latest(message.value as string | undefined);break
+     case 'history':value=await Service.history(message.value as Parameters<typeof Service.history>[0]);break
+     case 'intraday':value=await Service.intraday(message.value as Parameters<typeof Service.intraday>[0]);break
+     default:throw new Error('不支持的操作')
+    }
+    return {ok:true,value}
+   }catch(e){return {ok:false,error:e instanceof Error?e.message:'未知错误'}}
+  }
+  stage='安装消息桥'
+  await startup(view.addScriptMessageHandler('exchange',(message:{id:number;action:string;value?:unknown})=>{
+   handle(message).then(result=>reply({id:message?.id,...result}))
+   return true
+  }))
+  stage='读取本地文件'
+  const directory=Script.directory
+  const [template,style,core,ui]=await startup(Promise.all(['web/index.html','web/style.css','web/core.js','web/ui.js'].map(file=>FileManager.readAsString(directory+'/'+file))))
+  const safe=(s:string)=>s.replace(/<\/script/gi,'<\\/script')
+  const html=template.replace('/* 样式入口 */',()=>style).replace('/* 业务入口 */',()=>safe(core)).replace('/* 界面入口 */',()=>safe(ui))
+  stage='加载本地页面'
+  if(!await startup(view.loadHTML(html)))throw new Error('本地页面加载失败')
+  stage='展示 WebView'
+  await view.present({fullscreen:true})
+ }catch(e){
+  closed=true
+  const reason=e instanceof Error?e.message:String(e)
+  console.error(`汇率启动失败（${stage}）：${e instanceof Error?e.stack||e.message:reason}`)
+  // Dialog 为官方示例中的全局 API；错误展示失败仍保留控制台信息，不再次吞掉原因。
+  try{await Dialog.alert({title:'汇率启动失败',message:`步骤：${stage}\n${reason}\n请截图此信息反馈，并检查脚本文件是否完整。`,buttonLabel:'知道了'})}catch{console.error('启动错误弹窗展示失败，请查看上一条错误日志')}
+ }finally{closed=true;controller?.dispose();Script.exit()}
 }
-run().finally(()=>Script.exit())
+run()

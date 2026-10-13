@@ -1,39 +1,37 @@
 # 汇率
 
-面向 **iPhone Scripting App**（不是 Scriptable）的法币参考汇率工具。本地 **1.2.0**，本轮未发布GitHub。仅供参考，不是实时成交价、银行或银行卡结算报价，不提供数字货币。
+面向 **iPhone Scripting App**（不是 Scriptable）的法币参考汇率工具。本地 **1.2.1**，本轮未发布GitHub。仅供参考，不是实时成交价、银行或银行卡结算报价，不提供数字货币。
 
-## 原生导航
+## 1.2.1 启动恢复
 
-入口采用官方 `Navigation.present`、`NavigationStack.path`（`Observable<string[]>`）、`NavigationDestination` 和嵌入式 `WebView`。主页、详情、币种选择、设置、源/默认金额单选、小数点设置、法定货币选项都是真实原生目的地，不再把单WebView内部DOM切换称为原生导航。
+用户反馈1.2.0运行“无反应”。**具体手机根因尚未证实**，没有错误日志、手机Scripting版本或完整官方同步类型，不能把模拟结果当作根因定位。
 
-每个目的地拥有独立 `WebViewController`，仍加载本地HTML/CSS/JS。`navigation.ts`管理共享状态：配置、设置、快照、输入表达式/编辑状态、详情货币对/金额/周期及选择上下文。网页导航消息由原生push/pop，系统手势引起的path变化也使用同一状态恢复与释放路径。
+核查结果：1.2.0在展示前读取文件、构造Observable/会话、安装桥、加载根页后才调用Navigation.present；任一新增导出缺失、根页加载拒绝或等待不结束都可能阻断展示。文档提供NavigationStack/path/NavigationDestination，但Observable构造类说明不足以证明用户手机实际具备其同名导出；官方示例主要用组件内useObservable。正常Promise调度下，加载网页前session已经赋值，不能把“同步构造回调抢先访问session”断言为实际故障。原入口 `run().finally(()=>Script.exit())` 没有启动错误展示，拒绝后退出可能使故障看起来无反应，但尚无证据确认手机触发了哪条路径。
 
-- 已删除全部自绘返回按钮及自定义touch边缘返回手势。
-- 用官方 `navigationBarBackButtonHidden={true}` 隐藏系统返回按钮，没有UIKit桥或私有手势接口。宿主关闭机制由 `Navigation.present`提供，不伪造关闭按钮，未额外隐藏系统关闭控件。
-- 只dispose弹出页面，被子页覆盖的父页保留；pop后恢复共享状态。退出dispose全部控制器和Observable，最后 `Script.exit()`。
-- 页面使用 `postMessage` 请求，原生 `evaluateJavaScript` 调 `window.__exchangeReply` 回传Promise结果，60秒超时。销毁/非当前页面不接收异步回复；刷新与历史token防止旧请求覆盖新数据。已受理保存跨pop保留，后受理写入优先。
-- 所有原生页面采用系统默认转场，设置及子页没有附加回弹。主三页也未叠加整页transform回弹：公开API没有已核验的交互返回兼容定制方案，优先不干扰原生手势。**主列表行的跟手滑动及回弹保留**，左右过半仍自动push币种选择/详情。
+为优先恢复，1.2.1回到此前可打开版本采用的 **单WebViewController + loadHTML + present({fullscreen:true})**，不再导入NavigationStack、NavigationDestination、Observable，也不再依赖navigation.ts。保留最新设置、多源、金额变色和AC/删空语义。await消息桥安装完成后才加载页面，关闭后不再发送异步回复，finally释放控制器并exit。
 
-### 必须真机验收的限制
+安装桥、读文件、loadHTML三个启动await步骤分别有30秒等待诊断；错误先记录控制台，再用官方全局Dialog.alert显示“汇率启动失败”、阶段和原因，用户确认后才退出。present正常保持等待关闭，不加错误的30秒自动关闭限制。
 
-官方NavigationStack文档说明系统返回会同步path；但 `navigationBarBackButtonHidden` 文档**没有保证隐藏按钮后交互右滑仍可用**。本轮没有iPhone，不能声称已右滑成功。如果当前Scripting/iOS组合在隐藏按钮后禁用了手势，公开文档中没有已核验的强制开启API，本工具不会以自定义touch或虚构UIKit接口掩盖。需手机实测，再决定是否允许显示系统返回按钮或等待官方支持。
+### 临时返回方式及代价
 
-验收步骤：
-1. 设置→小数点设置→法定货币，右滑逐级返回；滑一半取消应不误pop、不丢值。
-2. 详情→币种选择→选择币种应程序pop回详情，再系统右滑回主页；主页左右滑过半应进入对应原生页。
-3. 确认隐藏按钮时系统右滑实际可用；若不可用，用宿主关闭机制结束并反馈Scripting/iOS版本，不能算通过验收。
-4. 键盘未完成算式进设置再返回应保持表达式；切源后立即返回/关闭、重启，检查配置、金额及无旧源覆盖。
-5. 检查深浅色、Safe Area/系统导航栏占用、字体/旗帜、键盘热区、关闭后重启和Storage。电脑模拟无法确认这些真实效果。
+**原生导航暂缓**，没有擅自恢复任何自绘返回按钮。子页暂用网页自定义左边缘右滑返回：左侧28px起始，水平超过70px且大于竖向位移。单网页内存保留输入、选择和设置状态；这不是系统原生交互返回，也不具备系统跟手取消效果。设置及子页不回弹；主页/详情/币种选择之间恢复既有方向进入动画，列表行跟手和回弹保留。宿主关闭机制不伪造、不额外隐藏。
 
-官方依据：`Scripting Documentation/webview_controller/en.md`、`webview/en.md`、`use_observable/en.md`、`views/navigation/navigation_stack/en.md`、`view_modifiers/navigation_view_modifiers/en.md`。当前没有App同步的完整官方 `.d.ts`，未虚构宿主声明。
+### 手机验收与错误信息
+
+本轮没有iPhone，1.2.1是恢复候选，不能声称已经在手机打开。
+1. 更新后确认设置底部为1.2.1，启动能显示六行；首次可离线验证页面是否出现，无行情应明确报错，不该无反应。
+2. 若出现启动失败弹窗，截图完整“步骤/原因”；从Scripting脚本编辑界面运行，提供任何错误提示或控制台完整日志、Scripting/iOS版本。确认脚本根目录有index.tsx/core.ts/service.ts和完整web目录。
+3. 验证临时边缘返回、小数三级页、源切换、数字输入仅金额变色、AC/删空恢复默认及重启持久化。若边缘返回在手机无效，需要用户决定是否恢复显式返回按钮，当前没有自行添加。
+
+官方依据：`Scripting Documentation/webview_controller/en.md`明确loadHTML返回Promise<boolean>、addScriptMessageHandler返回Promise<void>、present等待关闭、dispose释放；`views/dialog/en.md`和同目录官方示例确认全局Dialog.alert。原生导出风险核对使用`use_observable/en.md`、`views/navigation/navigation_stack/en.md`、`view_modifiers/navigation_view_modifiers/en.md`。本地没有完整官方.d.ts，未虚构声明。
 
 ## 换算与外观
 
 - 默认USD、CNY、CAD、EUR、GBP、AUD，基准CNY，初始金额100。主页右上角仅设置按钮，无刷新/更新/版本号。
 - 点击货币行将其作为基准，金额使用「货币默认值」（默认100）。替换基准行币种仍保留等值金额；重复币种不可选。货币选择支持中文/代码/国家地区搜索及拼音首字母索引拖动定位，详情选择不修改主列表。
-- **只有金额变色**：启动默认灰色；手动数字/小数点输入后，主页全部 `.amount`（含基准）夜间白、日间深色。名称、符号、代码、来源、键盘和设置文字保持原色，基准光标保留。编辑状态在本次原生会话共享，不额外持久化。
+- **只有金额变色**：启动默认灰色；手动数字/小数点输入后，主页全部 `.amount`（含基准）夜间白、日间深色。名称、符号、代码、来源、键盘和设置文字保持原色，基准光标保留。编辑状态在本次网页会话保留，不额外持久化。
 - **AC或退格删至表达式不再含数字**，恢复当前 `settings.defaultAmount`（默认100），恢复灰色和fresh状态，其他币种按默认值换算，下次数字替换默认金额。明确输入0仍是有效0且亮色；未完成算式仍含数字时，退格不会提前重置。
-- `+ - × ÷`遵循通常优先级，=结算；未完成算式保留最后有效金额，除零/无效/超范围提示。跨原生页面保留未完成表达式；跨脚本运行只保存最后有效金额。
+- `+ - × ÷`遵循通常优先级，=结算；未完成算式保留最后有效金额，除零/无效/超范围提示。跨网页页面保留未完成表达式；跨脚本运行只保存最后有效金额。
 - 延续深浅色变量、内嵌DinLike（Barlow）字体和系统中文字体；字体许可见 `FONT-LICENSE-Barlow-OFL.txt`，无网络字体，不仿制状态栏。
 
 ## 换算设置
@@ -44,7 +42,7 @@
 - **货币默认值**：1/10/100/1,000/10,000，默认100；影响后续基准点击、详情基准金额、恢复列表及AC/删空，不擅自改动正在输入的金额。
 - **小数点位数**：设置→「小数点设置」→「法定货币」。新选项仅无（0）/2/4/6/8位，行高64px、标签17px、灰色示例14px（`1,234`、`1,234.00`等）、右侧对勾，无卡片边框。保存后返回小数点设置，当前值即时同步。旧合法0–8位（含奇数）保留至主动新选，默认仍2位，不静默重置。主页/详情金额及最高最低平均按该位数显示，涨跌百分比仍4位。
 - **恢复默认币种列表**需confirm二次确认，恢复默认六币、基准CNY和当前默认金额，不重置其余设置或缓存。
-- 设置底部「汇率 版本 1.2.0」来自core.ts VERSION。
+- 设置底部「汇率 版本 1.2.1」来自core.ts VERSION。
 
 没有当地货币开关：Intl/navigator.language不能可靠读取系统货币，故不猜测、不修改配置。没有更多设置或数字货币设置，不扩大行情范围。
 
@@ -77,7 +75,7 @@
 
 使用当前Scripting App。[一键导入](https://scripting.fun/import_scripts?urls=["https%3A%2F%2Fgithub.com%2FWangsc1%2Fexchange"])；更新用 **Scripting自带长按更新或一键导入**，保留 `script.json.remoteResource.url`，无应用内更新、无update.ts。
 
-1.2.0本地导入需 `script.json`、`index.tsx`、`navigation.ts`、`core.ts`、`service.ts`及完整 `web/`。core/script/version三处同步1.2.0，version.json保留中文摘要和文件清单。
+1.2.1本地导入需 `script.json`、`index.tsx`、`core.ts`、`service.ts`及完整 `web/`。core/script/version三处同步1.2.1，version.json保留中文摘要和文件清单。
 
 ## 本地验证
 
@@ -91,8 +89,14 @@ node --test tests/*.test.mjs
 node scripts/live-data.mjs
 ```
 
-本轮build/check通过，**50/50测试通过**，输出 `/tmp/exchange-test-1.2.0.txt`。保留数据层/缓存/计算/格式测试；会话类和实际index入口的模拟覆盖push/pop/dispose、隐藏返回属性、异步回复不落销毁页、旧源不覆盖新源、表达式/选择共享、三级小数/奇数兼容、仅金额编辑配色、AC/删空恢复默认及有效0。已删除旧DOM返回和自定义边缘手势测试。
+本轮build/check通过，**53/53测试通过**，输出 `/tmp/exchange-test-1.2.1.txt`。启动模拟覆盖实际入口的加载/展示/释放顺序、创建/安装桥/读文件/加载/展示失败、await超时显示诊断，以及关闭后丢弃迟到回复。DOM测试覆盖临时边缘返回、设置不回弹、主三页动画、数据与格式、旧奇数位、仅金额变色、AC/删空恢复默认及有效0；保留原源解析/缓存/计算测试。
 
-测试运行真实源码，但Navigation宿主、Observable回调和WebView明确模拟，**不等于iPhone真机验证**。check严格检查core/navigation纯模块、入口语法、构建一致性和版本；无官方完整宿主类型。取得App同步声明后可运行 `node scripts/check.mjs /官方声明目录`。
+这些是明确的宿主/DOM模拟，**不等于iPhone启动成功验证**。check严格检查core纯模块、全部入口语法、构建一致性及版本；无官方完整宿主类型。取得App同步声明后可执行 `node scripts/check.mjs /官方声明目录`。
 
-文件：index.tsx原生入口；navigation.ts会话/栈协调；core.ts算法/设置/源解析；service.ts网络/Storage；web/本地UI及生成core.js；scripts/构建/检查/真实接口核验；tests/测试（夹具仅此目录）；FONT-LICENSE-Barlow-OFL.txt字体许可。
+## 币种数量只读核对
+
+当前core.CURRENCIES是原先固定的 **30种法币**：USD、CNY、CAD、EUR、GBP、AUD、BRL、CHF、CZK、DKK、HKD、HUF、IDR、ILS、INR、ISK、JPY、KRW、MXN、MYR、NOK、NZD、PHP、PLN、RON、SEK、SGD、THB、TRY、ZAR。
+
+所有源解析都只保留这个目录，选择页再与snapshot.rates取交集，并按搜索条件显示。源端点有166/146或更多币种，不代表本工具全部展示；此前实测BOC保留23种，其他已纳入源保留30种。常用分组和字母分组可能重复展示同一币种，应按唯一代码计数。这是既有目录/来源覆盖限制，不是本次导航删除了大量币种；本轮没有扩充法币或数字货币，也未重新调查全部真实接口。
+
+文件：index.tsx单WebView入口与启动诊断；core.ts算法/设置/源解析；service.ts网络/Storage；web/本地UI及生成core.js；scripts/构建/检查/真实接口核验；tests/测试（夹具仅此目录）；FONT-LICENSE-Barlow-OFL.txt字体许可。navigation.ts已删除，旧手机残留该文件不会被入口引用。
