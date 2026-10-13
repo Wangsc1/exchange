@@ -8,7 +8,7 @@
 
 - 背景 `#14181b`，六行旗帜/代码/数值/中文名，基准行灰底；底部数据源与 4×4 数字/运算键盘。没有仿制状态栏、小程序胶囊或卡片边框。
 - 左滑露出青色「汇率详情」；右滑露出蓝色「切换货币」，各占半行宽。
-- 使用官方 `addScriptMessageHandler` 与 `window.webkit.messageHandlers.exchange.postMessage(...)` 的 Promise 桥接；先注册桥再加载本地页面。
+- 使用官方 `addScriptMessageHandler` 接收页面消息；真机反馈证明依赖 postMessage 返回值会报“原生操作失败”，因此 1.0.1 起原生处理完成后用 `evaluateJavaScript` 调用页面 `window.__exchangeReply` 回传结果，页面按请求编号匹配并带 60 秒超时。
 - `present({ fullscreen: true })` 等待页面关闭；`finally` 中调用 `dispose()`、`Script.exit()`。菜单中也提供关闭按钮。
 - 唯一业务源是 `core.ts`；`web/core.js` 是预编译版本。手机无需 Node、npm 或编译步骤。
 

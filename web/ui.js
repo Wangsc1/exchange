@@ -4,12 +4,19 @@ const $ = id => document.getElementById(id);
 let config = Core.normalizeConfig(null), snapshot = null, expr = '100', fresh = true;
 let offline = false, warning = '', busy = false, page = 'home', toastTimer, saveQueue = Promise.resolve();
 let selection = null, detailBase = 'CNY', detailQuote = 'USD', detailAmount = 100, period = 30, historyToken = 0;
-async function bridge(action, value) {
+// 原生处理函数不依赖 postMessage 返回值：原生完成后主动调用 window.__exchangeReply 回传结果。
+const pending = new Map(); let seq = 0;
+window.__exchangeReply = (reply) => { const item = pending.get(reply && reply.id); if (!item) return; pending.delete(reply.id); clearTimeout(item.timer); reply.ok ? item.resolve(reply.value) : item.reject(new Error(reply.error || '原生操作失败')); };
+function bridge(action, value) {
   const handler = window.webkit?.messageHandlers?.exchange;
-  if (!handler) throw new Error('请在 iPhone Scripting 中运行本脚本，浏览器没有原生数据桥');
-  const result = await handler.postMessage({ action, value });
-  if (!result || !result.ok) throw new Error(result?.error || '原生操作失败');
-  return result.value;
+  if (!handler) return Promise.reject(new Error('请在 iPhone Scripting 中运行本脚本，浏览器没有原生数据桥'));
+  const id = ++seq;
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { pending.delete(id); reject(new Error('原生操作超时，请重试')); }, 60000);
+    pending.set(id, { resolve, reject, timer });
+    try { Promise.resolve(handler.postMessage({ id, action, value })).catch(e => window.__exchangeReply({ id, ok: false, error: '消息发送失败：' + (e && e.message || e) })); }
+    catch (e) { window.__exchangeReply({ id, ok: false, error: '消息发送失败：' + (e && e.message || e) }); }
+  });
 }
 function toast(message) { $('toast').textContent = message; $('toast').classList.remove('hidden'); clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').classList.add('hidden'), 5500); }
 function show(target) { page = target; for (const id of ['home', 'detail', 'selector', 'menu']) $(id).classList.toggle('hidden', id !== target); }
@@ -57,7 +64,7 @@ function renderRows() {
 }
 function render() {
   renderRows(); $('expression').textContent = `${expr} ${config.base}`;
-  $('source').textContent = snapshot ? `Frankfurter · ECB | ${snapshot.date} · 工作日日更 · 仅供参考${offline ? ' | 离线缓存' : ''}${warning ? ' | ' + warning : ''}` : 'Frankfurter · ECB | 暂无数据，请联网刷新（仅供参考）';
+  $('source').textContent = snapshot ? `Frankfurter · ECB | ${snapshot.date} · 工作日日更 · 仅供参考${offline ? ' | 离线缓存' : ''}${warning ? ' | ' + warning : ''}` : `Frankfurter · ECB | ${warning ? '取数失败：' + warning : '暂无数据，请联网刷新'}（仅供参考）`;
 }
 async function refresh() {
   if (busy) return; busy = true; $('refresh').disabled = true;

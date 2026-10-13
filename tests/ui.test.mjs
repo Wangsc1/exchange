@@ -11,7 +11,7 @@ const tick=()=>new Promise(r=>setTimeout(r,20));
 async function boot(options={}){
   const window=new Window({settings:{enableJavaScriptEvaluation:true}}),saves=[],requests=[];
   window.confirm=()=>true;
-  window.webkit={messageHandlers:{exchange:{postMessage:async m=>{
+  const handle=async m=>{
     requests.push(m);
     if(m.action==='config')return {ok:true,value:options.config||Core.normalizeConfig(null)};
     if(m.action==='save'){saves.push(plain(m.value));return {ok:true,value:m.value};}
@@ -19,7 +19,9 @@ async function boot(options={}){
     if(m.action==='history')return {ok:true,value:{value:[{date:'2026-01-02',base:m.value.base,quote:m.value.quote,rate:Core.convert(1,m.value.base,m.value.quote,fixture)}],offline:false,warning:''}};
     if(m.action==='checkUpdate')return {ok:false,error:'请求失败 HTTP 404'};
     return {ok:true,value:true};
-  }}}};
+  };
+  // 模拟真机：postMessage 不返回结果，原生稍后用 evaluateJavaScript 回调页面。
+  window.webkit={messageHandlers:{exchange:{postMessage:m=>{handle(m).then(r=>window.__exchangeReply({id:m.id,...r}));}}}};
   window.document.write(readFileSync(root+'web/index.html','utf8'));
   window.eval(readFileSync(root+'web/core.js','utf8')+'\n'+readFileSync(root+'web/ui.js','utf8'));
   await tick();return {window,document:window.document,saves,requests,close:()=>window.happyDOM.abort()};

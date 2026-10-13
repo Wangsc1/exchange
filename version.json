@@ -1,5 +1,5 @@
 {
-  "version": "1.0.0",
-  "notes": "首次发布：ECB法币参考汇率、真实日历史、离线缓存与四则计算。",
+  "version": "1.0.1",
+  "notes": "修复手机端“原生操作失败”：改为原生主动回传结果；取数失败时显示具体原因。",
   "files": ["index.tsx", "core.ts", "service.ts", "update.ts", "web/index.html", "web/style.css", "web/ui.js", "web/core.js"]
 }
