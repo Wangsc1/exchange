@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="color-scheme" content="dark"><title>汇率</title><style>/* 样式入口 */</style></head>
+<body>
+<main id="home" class="page">
+  <header><h1>汇率</h1><div><button id="refresh" aria-label="刷新汇率">↻</button><button id="settings" aria-label="设置">☰</button></div></header>
+  <section id="rows" aria-label="货币列表"></section>
+  <div id="source" role="status">正在加载 ECB 参考汇率…</div>
+  <div class="expression"><span id="expression">100 CNY</span><button id="clear">AC</button><button id="equals">=</button></div>
+  <section id="keyboard" aria-label="计算键盘"></section>
+</main>
+<section id="detail" class="page hidden">
+  <header><button id="detailBack">‹ 返回</button><span>汇率详情</span><button id="pairChoice">货币对</button></header>
+  <div id="pair" class="pair"></div><div id="bigAmount"></div><div id="unitRate" class="muted"></div>
+  <nav id="periods" aria-label="历史周期"></nav>
+  <div id="historyStatus" class="muted" role="status"></div>
+  <svg id="chart" viewBox="0 0 360 210" role="img" aria-label="真实日历史汇率折线"></svg>
+  <div id="chartDates" class="muted"></div><div id="stats"></div>
+  <footer>数据源：Frankfurter · 欧洲央行（ECB）<br>工作日日更，日期以实际记录为准；仅供参考，非交易、银行或卡组织报价。周末与休市日无新点。</footer>
+</section>
+<section id="selector" class="page hidden">
+  <header><button id="selectorBack">‹ 返回</button><h1 id="selectTitle">切换货币</h1><button id="selectorDone">完成</button></header>
+  <input id="search" type="search" placeholder="搜索中文 / 代码 / 国家地区" aria-label="搜索货币" autocomplete="off"><div id="currencyList"></div>
+</section>
+<section id="menu" class="page hidden">
+  <header><button id="menuBack">‹ 返回</button><h1>设置</h1><button id="close">关闭</button></header>
+  <div class="settingsContent"><p>汇率 <span id="version"></span></p><p class="muted">法币参考汇率 · ECB 工作日更新<br>程序更新保留币种及金额，不覆盖手机 script.json。</p><button id="checkUpdate" class="wide">在线检查更新</button><p id="updateStatus" role="status"></p><button id="install" class="wide hidden">确认更新程序</button><p class="muted">来源：Wangsc1/exchange（公开仓库）<br>更新后需关闭并重新运行；不会自动安装。</p></div>
+</section>
+<div id="toast" class="hidden" role="alert"></div>
+<script>/* 业务入口 */</script><script>/* 界面入口 */</script>
+</body></html>

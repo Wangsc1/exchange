@@ -1,0 +1,13 @@
+{
+  "name": "exchange-scripting",
+  "version": "1.0.0",
+  "private": true,
+  "description": "汇率脚本的本地构建与验证工具，手机运行不依赖这些包",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "check": "node scripts/check.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:live": "node scripts/live-data.mjs"
+  },
+  "devDependencies": { "typescript": "5.9.3", "happy-dom": "15.11.7" }
+}
