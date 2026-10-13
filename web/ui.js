@@ -118,7 +118,7 @@ function render() {
   renderRows(); $('expression').textContent = `${expr} ${config.base}`;
   const src = Core.SOURCES.find(s => s.key === settings.source);
   $('source').classList.toggle('hidden', !settings.showSource);
-  $('source').textContent = `${src.name} | ${snapshot ? snapshot.date : '暂无数据'} · ${src.description} · 仅供参考${offline ? ' | 离线缓存' : ''}${warning ? ' | ' + warning : ''}`;
+  $('source').textContent = `${src.name} | ${snapshot ? snapshot.date : '暂无数据'}${offline ? ' | 离线缓存' : ''}${warning ? ' | ' + warning : ''}`;
 }
 async function refresh() {
   const token = ++refreshToken, key = settings.source; busy = true;
