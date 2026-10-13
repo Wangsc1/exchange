@@ -109,6 +109,7 @@ function renderRows() {
       if (dragged) { dragged = false; return; }
       if (offset) { offset = 0; setOffset(0, true); return; }
       if (!snapshot) return toast('请先刷新取得汇率');
+      if(!snapshot.rates[code])return toast('本源没有'+code+'汇率，请切换此行币种或换源');
       try { config = { ...config, base: code, amount: settings.defaultAmount }; expr = numberText(settings.defaultAmount); fresh = true; edited = false; persist(); render(); } catch (e) { toast(e.message); }
     };
     row.append(swap, info, content); $('rows').append(row);
@@ -123,13 +124,14 @@ function render() {
 async function refresh() {
   const token = ++refreshToken, key = settings.source; busy = true;
   snapshot = null; warning = ''; render();
-  try { const r = await bridge('latest', key); if(token !== refreshToken)return; snapshot = Core.validateSnapshot(r.value); offline = r.offline; warning = r.warning; fetchedAt = r.fetchedAt || null; if (warning) toast(warning); }
+  try { const r = await bridge('latest', key); if(token !== refreshToken)return; snapshot = Core.validateSnapshot(r.value); offline = r.offline; warning = r.warning; fetchedAt = r.fetchedAt || null; const missing=config.codes.filter(c=>!snapshot.rates[c]);if(missing.length){const note='本源不覆盖已选 '+missing.join('/')+'，保留配置不自动折算，请切换缺失行或换源';warning=[warning,note].filter(Boolean).join('；');} if (warning) toast(warning); }
   catch (e) { if(token !== refreshToken)return; warning = e.message; toast(e.message); }
   finally { if(token === refreshToken){busy = false; render(); renderSettings();} }
 }
 
 function restoreDefaultAmount(){config.amount=settings.defaultAmount;expr=numberText(config.amount);fresh=true;edited=false;persist();render();}
 function input(key) {
+  if(key==='⌫'&&!edited)return; // 灰显默认值不可退格；数字键仍替换并进入编辑态。
   // keyInput 的零占位不能用于判断删空：先查看退格后的原始表达式是否还含数字。
   if(key==='AC'||(key==='⌫'&&!/[0-9]/.test(expr.slice(0,-1)))){restoreDefaultAmount();return;}
   if(/^[0-9.]$/.test(key))edited=true;
@@ -188,7 +190,7 @@ function renderSelector() {
       b.disabled = selection.kind === 'row' ? config.codes.includes(c.code) && c.code !== selectedCode() : selection.kind === 'base' ? c.code === detailQuote : c.code === detailBase;
       b.onclick = () => {
         try {
-          if (selection.kind === 'row') { config = Core.replaceCurrency(config, selection.index, c.code, snapshot); expr = numberText(config.amount); fresh = true; persist(); render(); }
+          if (selection.kind === 'row') { if(config.base===config.codes[selection.index]&&!snapshot.rates[config.base])throw new Error('旧基准币无本源汇率，不能折算金额；请先点击有汇率的行设为基准，再替换缺失行'); config = Core.replaceCurrency(config, selection.index, c.code, snapshot); expr = numberText(config.amount); fresh = true; persist(); render(); }
           else if (selection.kind === 'base') { detailAmount = settings.defaultAmount; detailBase = c.code; }
           else detailQuote = c.code;
           show(selection.back, 'back');
@@ -202,6 +204,7 @@ function renderSelector() {
 $('search').oninput = renderSelector;
 function openDetail(code) {
   if (!snapshot) return toast('请先取得汇率');
+  if(!snapshot.rates[code])return toast('本源没有'+code+'汇率，无法打开换算详情');
   try { detailBase = code; detailAmount = settings.defaultAmount; detailQuote = code === 'USD' ? 'CNY' : 'USD'; show('detail', 'right'); } catch (e) { toast(e.message); }
 }
 function renderDetail() {
@@ -209,6 +212,7 @@ function renderDetail() {
   const b = element('button', `${Core.flag(base.country)} ${numberText(detailAmount)} ${detailBase}`), q = element('button', `${Core.flag(quote.country)} ${detailQuote} ▾`);
   b.onclick = () => openSelector({kind:'base',back:'detail'}); q.onclick = () => openSelector({kind:'quote',back:'detail'});
   $('pair').append(b, element('span',' → '), q);
+  if(!snapshot.rates[detailBase]||!snapshot.rates[detailQuote]){ $('bigAmount').textContent='—';$('detailSource').textContent='当前源没有所选币种汇率，请更换币种或源；没有混入其他来源。';$('historyStatus').textContent='当前币种不可换算';$('chart').replaceChildren();$('stats').replaceChildren();$('chartDates').replaceChildren();return; }
   $('bigAmount').textContent = formatted(Core.convert(detailAmount, detailBase, detailQuote, snapshot));
   $('periods').replaceChildren();
   Core.PERIODS.forEach(p => { const button = element('button',p.label,p.days === period ? 'active' : ''); button.onclick = () => { period = p.days; renderDetail(); }; $('periods').append(button); });

@@ -23,6 +23,11 @@ exports.crossIntraday = crossIntraday;
 exports.validateIntraday = validateIntraday;
 exports.normalizeSettings = normalizeSettings;
 exports.parseSource = parseSource;
+exports.parseSAFE = parseSAFE;
+exports.parseCBR = parseCBR;
+exports.parseFED = parseFED;
+exports.inforEuroRequest = inforEuroRequest;
+exports.parseInforEuro = parseInforEuro;
 exports.DEFAULT_CODES = ['USD', 'CNY', 'CAD', 'EUR', 'GBP', 'AUD'];
 // 当前 ECB 常规发布的法币；没有行情的币种不会出现在选择列表中。
 exports.CURRENCIES = [
@@ -170,7 +175,7 @@ async function cached(store, key, load, validate) {
         }
     }
 }
-exports.VERSION = '1.2.2';
+exports.VERSION = '1.3.0';
 function parseYahoo(data) {
     const r = data?.chart?.result?.[0];
     const ts = r?.timestamp, close = r?.indicators?.quote?.[0]?.close;
@@ -217,7 +222,11 @@ exports.SOURCES = [
     { key: 'er', name: 'ExchangeRate-API', description: '开放参考汇率，每日更新', url: 'https://open.er-api.com/v6/latest/EUR', cache: 'rates.er.v1' },
     { key: 'fawaz-cdn', name: '开源汇率 · jsDelivr', description: 'fawazahmed0 每日数据，CDN 日期可能滞后', url: 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/eur.json', cache: 'rates.fawaz-cdn.v1' },
     { key: 'fawaz-pages', name: '开源汇率 · Cloudflare', description: 'fawazahmed0 每日数据', url: 'https://latest.currency-api.pages.dev/v1/currencies/eur.json', cache: 'rates.fawaz-pages.v1' },
-    { key: 'float', name: 'FloatRates', description: '综合参考汇率，约每12小时更新', url: 'https://www.floatrates.com/daily/eur.json', cache: 'rates.float.v1' }
+    { key: 'float', name: 'FloatRates', description: '综合参考汇率，约每12小时更新', url: 'https://www.floatrates.com/daily/eur.json', cache: 'rates.float.v1' },
+    { key: 'safe', name: '国家外汇管理局 · 人民币中间价', description: 'SAFE官方转发中国外汇交易中心数据；工作日中间价，100单位直接/间接标价，非买卖价', url: 'https://www.safe.gov.cn/AppStructured/hlw/RMBQuery.do', cache: 'rates.safe.v1' },
+    { key: 'fed', name: '美联储 · H.10', description: '美联储官方周报中的每日纽约午间买入参考价；周一发布上周数据，以USD交叉换算，非用户成交报价', url: 'https://www.federalreserve.gov/releases/h10/current/', cache: 'rates.fed.v1' },
+    { key: 'inforeuro', name: '欧盟委员会 · InforEuro', description: '欧盟委员会官方月度会计汇率；日期为适用月份首日，不是当天市场报价', url: 'https://ec.europa.eu/budg/inforeuro/api/public/monthly-rates', cache: 'rates.inforeuro.v1' },
+    { key: 'cbr', name: '俄罗斯央行 · CBR', description: '俄罗斯央行官方每日汇率；日期为官方生效日，按Nominal折算卢布，央行不承诺按此买卖', url: 'https://www.cbr.ru/scripts/XML_daily.asp', cache: 'rates.cbr.v1' }
 ];
 function normalizeSettings(value) {
     const v = value;
@@ -228,6 +237,14 @@ function normalizeSettings(value) {
 function parseSource(key, data) {
     if (!exports.SOURCES.some(s => s.key === key))
         throw new Error('未知汇率源');
+    if (key === 'safe')
+        return parseSAFE(data);
+    if (key === 'fed')
+        return parseFED(data);
+    if (key === 'cbr')
+        return parseCBR(data);
+    if (key === 'inforeuro')
+        return parseInforEuro(data);
     const d = data;
     if (key === 'ecb' || key === 'boc') {
         if (!Array.isArray(d))
@@ -275,6 +292,137 @@ function parseSource(key, data) {
         }
     }
     return validateSnapshot({ date, rates });
+}
+// 官方结构化页面/XML解析：不执行远程脚本，不依赖宿主DOM，不用请求日伪造报价日。
+function sourceText(data) { if (typeof data !== 'string' || !data.trim())
+    throw new Error('官方数据格式异常'); return data.replace(/<!--[\s\S]*?-->/g, ''); }
+function cellText(s) { return s.replace(/<[^>]*>/g, ' ').replace(/&nbsp;|&#160;/g, ' ').replace(/\s+/g, ' ').trim(); }
+function positive(s) { if (!/^\d+(?:[.,]\d+)?$/.test(s))
+    throw new Error('官方汇率数值异常'); const n = Number(s.replace(',', '.')); if (!Number.isFinite(n) || n <= 0)
+    throw new Error('官方汇率数值异常'); return n; }
+function rows(table) { return [...table.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/gi)].map(m => [...m[1].matchAll(/<t[hd]\b[^>]*>([\s\S]*?)<\/t[hd]>/gi)].map(c => cellText(c[1]))); }
+// 输入是每1 pivot可兑换的外币数量。EUR归一后每1EUR可兑换该币数量。
+function pivotSnapshot(date, pivot, perPivot) {
+    const eur = perPivot.EUR;
+    if (!eur || perPivot[pivot] !== 1)
+        throw new Error('官方数据缺少欧元或基准币');
+    const rates = {};
+    for (const c of exports.CURRENCIES) {
+        const n = perPivot[c.code];
+        if (n !== undefined) {
+            if (!Number.isFinite(n) || n <= 0)
+                throw new Error('官方汇率数值异常');
+            rates[c.code] = c.code === 'EUR' ? 1 : n / eur;
+        }
+    }
+    return validateSnapshot({ date, rates });
+}
+function parseSAFE(data) {
+    const text = sourceText(data), table = text.match(/<table\b[^>]*\bid=["']InfoTable["'][^>]*>[\s\S]*?<\/table>/i)?.[0];
+    if (!table)
+        throw new Error('SAFE官方表格结构变化');
+    const all = rows(table), headers = all[0];
+    if (!headers || headers[0] !== '日期')
+        throw new Error('SAFE官方表头异常');
+    const codes = { '美元': 'USD', '欧元': 'EUR', '日元': 'JPY', '港元': 'HKD', '英镑': 'GBP', '澳元': 'AUD', '新西兰元': 'NZD', '新加坡元': 'SGD', '瑞士法郎': 'CHF', '加元': 'CAD', '澳门元': 'MOP', '林吉特': 'MYR', '卢布': 'RUB', '兰特': 'ZAR', '韩元': 'KRW', '迪拉姆': 'AED', '里亚尔': 'SAR', '福林': 'HUF', '兹罗提': 'PLN', '丹麦克朗': 'DKK', '瑞典克朗': 'SEK', '挪威克朗': 'NOK', '里拉': 'TRY', '比索': 'MXN', '泰铢': 'THB' };
+    const indirect = new Set(['MOP', 'MYR', 'RUB', 'ZAR', 'KRW', 'AED', 'SAR', 'HUF', 'PLN', 'DKK', 'SEK', 'NOK', 'TRY', 'MXN', 'THB']);
+    const quotes = headers.slice(1).map(h => codes[h]);
+    if (quotes.some(c => !c) || new Set(quotes).size !== quotes.length)
+        throw new Error('SAFE币种表头变化');
+    const records = all.slice(1).filter(r => r.length);
+    if (records.some(r => !validDate(r[0]) || r.length !== headers.length))
+        throw new Error('SAFE官方日期或数据异常');
+    records.sort((a, b) => b[0].localeCompare(a[0]));
+    const r = records[0];
+    if (!r || r.length !== headers.length)
+        throw new Error('SAFE官方日期或数据异常');
+    const perCNY = { CNY: 1 };
+    quotes.forEach((c, i) => { const v = r[i + 1]; if (v === '-' || v === '—' || v === '')
+        return; const n = positive(v); perCNY[c] = indirect.has(c) ? n / 100 : 100 / n; });
+    return pivotSnapshot(r[0], 'CNY', perCNY);
+}
+function parseCBR(data) {
+    const text = sourceText(data), date = text.match(/<ValCurs\b[^>]*\bDate=["'](\d{2})\.(\d{2})\.(\d{4})["']/)?.slice(1);
+    if (!date || !/<\/ValCurs>\s*$/.test(text))
+        throw new Error('CBR官方日期或XML异常');
+    const perRUB = { RUB: 1 }, seen = new Set();
+    for (const m of text.matchAll(/<Valute\b[^>]*>([\s\S]*?)<\/Valute>/g)) {
+        const field = (name) => m[1].match(new RegExp(`<${name}>([^<]+)</${name}>`))?.[1].trim();
+        const c = field('CharCode');
+        if (!c || !/^([A-Z]{3})$/.test(c) || seen.has(c) || c === 'RUB')
+            throw new Error('CBR币种异常');
+        seen.add(c);
+        const nominal = positive(field('Nominal') || ''), value = positive(field('Value') || '');
+        if (!Number.isInteger(nominal))
+            throw new Error('CBR报价单位异常');
+        perRUB[c] = nominal / value;
+    }
+    return pivotSnapshot(`${date[2]}-${date[1]}-${date[0]}`, 'RUB', perRUB);
+}
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+function parseFED(data) {
+    const text = sourceText(data), release = text.match(/Release Date:\s*([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})/);
+    if (!release || !text.includes('Rates in currency units per U.S. dollar except as noted by an asterisk') || !text.includes('U.S. dollars per currency unit'))
+        throw new Error('H.10官方日期或报价单位变化');
+    const rm = MONTH_NAMES.indexOf(release[1]) + 1, rd = `${release[3]}-${String(rm).padStart(2, '0')}-${release[2].padStart(2, '0')}`;
+    if (!validDate(rd))
+        throw new Error('H.10发布日期异常');
+    const table = text.match(/<table\b[^>]*class=["']statistics["'][^>]*>[\s\S]*?<\/table>/i)?.[0];
+    if (!table)
+        throw new Error('H.10官方表格结构变化');
+    const all = rows(table), header = all[0];
+    if (!header || header[0] !== 'COUNTRY' || header[1] !== 'CURRENCY' || header.length < 3)
+        throw new Error('H.10表头异常');
+    const countries = { 'AUSTRALIA': 'AUD', 'BRAZIL': 'BRL', 'CANADA': 'CAD', 'CHINA, P.R.': 'CNY', 'DENMARK': 'DKK', 'EMU MEMBERS': 'EUR', 'HONG KONG': 'HKD', 'INDIA': 'INR', 'JAPAN': 'JPY', 'MALAYSIA': 'MYR', 'MEXICO': 'MXN', 'NEW ZEALAND': 'NZD', 'NORWAY': 'NOK', 'SINGAPORE': 'SGD', 'SOUTH AFRICA': 'ZAR', 'SOUTH KOREA': 'KRW', 'SWEDEN': 'SEK', 'SWITZERLAND': 'CHF', 'THAILAND': 'THB', 'UNITED KINGDOM': 'GBP' };
+    const seen = new Set(), fx = all.slice(1).filter(r => countries[r[0]?.replace(/^\*\s*/, '')]);
+    for (const r of fx) {
+        const c = countries[r[0].replace(/^\*\s*/, '')];
+        if (seen.has(c) || r.length !== header.length)
+            throw new Error('H.10币种或列异常');
+        seen.add(c);
+    }
+    // 周报假期ND不倒填其他日期；选择最近一个默认六币同日齐备的观测列。
+    for (let col = header.length - 1; col >= 2; col--) {
+        const h = header[col].match(/^([A-Za-z]+)\.?\s+(\d{1,2})$/), month = h ? MONTH_NAMES.findIndex(m => m === h[1] || m.slice(0, 3) === h[1]) + 1 : 0;
+        if (!h || !month)
+            throw new Error('H.10观测日期异常');
+        let year = Number(release[3]);
+        if (month > rm)
+            year--;
+        const date = `${year}-${String(month).padStart(2, '0')}-${h[2].padStart(2, '0')}`;
+        if (!validDate(date) || date > rd || Date.parse(rd) - Date.parse(date) > 14 * 86400000)
+            throw new Error('H.10观测日期异常');
+        const perUSD = { USD: 1 };
+        for (const r of fx) {
+            const c = countries[r[0].replace(/^\*\s*/, '')], v = r[col];
+            if (v === 'ND')
+                continue;
+            const n = positive(v);
+            perUSD[c] = r[0].startsWith('*') ? 1 / n : n;
+        }
+        if (exports.DEFAULT_CODES.every(c => perUSD[c]))
+            return pivotSnapshot(date, 'USD', perUSD);
+    }
+    throw new Error('缺少默认币种汇率（H.10同日数据）');
+}
+// 官方API以year/month确定适用期，响应无逐日报价日期。首日仅代表会计月份，非抓取日。
+function inforEuroRequest(now = new Date()) {
+    const year = now.getUTCFullYear(), month = now.getUTCMonth() + 1;
+    return { url: `${exports.SOURCES.find(s => s.key === 'inforeuro').url}?year=${year}&month=${month}`, year, month };
+}
+function parseInforEuro(data) {
+    const d = data;
+    if (!d || !Number.isInteger(d.year) || d.year < 1994 || d.year > 9999 || !Number.isInteger(d.month) || d.month < 1 || d.month > 12 || !Array.isArray(d.rates) || !d.rates.length)
+        throw new Error('InforEuro适用月份或官方数据异常');
+    const rates = {}, seen = new Set();
+    for (const r of d.rates) {
+        if (!r || !/^([A-Z]{3})$/.test(r.isoA3Code) || seen.has(r.isoA3Code) || typeof r.value !== 'number' || !Number.isFinite(r.value) || r.value <= 0)
+            throw new Error('InforEuro官方汇率异常');
+        seen.add(r.isoA3Code);
+        if (exports.CURRENCIES.some(c => c.code === r.isoA3Code))
+            rates[r.isoA3Code] = r.value;
+    }
+    return validateSnapshot({ date: `${d.year}-${String(d.month).padStart(2, '0')}-01`, rates });
 }
 
 return exports; })();
