@@ -10,14 +10,19 @@
 
 body,button,input{font-family:"DinLike",-apple-system,BlinkMacSystemFont,"PingFang SC","Helvetica Neue",sans-serif}.code{letter-spacing:.02em}.amount,#bigAmount,#stats strong,.expression,#keyboard button{font-weight:300}h1,.code,.name,.muted{font-weight:400}
 
-body{overflow-x:hidden}.enterRight{animation:pageInRight .5s cubic-bezier(.34,1.35,.64,1)}.enterLeft{animation:pageInLeft .5s cubic-bezier(.34,1.35,.64,1)}@keyframes pageInRight{from{transform:translateX(100%)}to{transform:none}}@keyframes pageInLeft{from{transform:translateX(-100%)}to{transform:none}}@media(prefers-reduced-motion:reduce){.enterRight,.enterLeft{animation:none}.swipe{transition:none}}
+body{overflow-x:hidden}
 
-#detailBack,#selectorBack,#menuBack{min-width:88px;min-height:52px;margin:-4px 0 -4px -16px;padding:0 16px;text-align:left;display:flex;align-items:center;font-size:17px;touch-action:manipulation}
-#detailBack:active,#selectorBack:active,#menuBack:active{opacity:.55}
-.headerSpacer{width:88px}
-.enterRight,.enterLeft{animation-duration:.38s}
 
-#choicesBack{min-width:88px;min-height:52px;margin:-4px 0 -4px -16px;padding:0 16px;text-align:left;font-size:17px}#choicesBack:active{opacity:.55}
-#menu,#choices{height:100vh;height:100dvh;display:flex;flex-direction:column}.settingsContent{overflow:auto;flex:1;padding:16px 20px}.settingRow{display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;min-height:60px;text-align:left;border-bottom:1px solid var(--sel);font-size:16px}.settingRow .muted{max-width:55%;text-align:right}.toggle{font-size:11px;border-radius:20px;background:var(--sel);color:var(--muted);padding:8px 12px}.toggle.on{background:#58bfc0;color:#14181b}#lastUpdated{margin:0;padding:0 0 18px;border-bottom:1px solid var(--sel)}#resetCurrencies{display:block;margin:45px auto 20px;min-height:52px;font-size:15px;color:var(--fg)}#version{text-align:center;margin:28px 0 12px}.settingsContent .check{margin-left:auto;color:var(--check)}
+
+#menu,#choices,#decimalSettings,#decimalChoices{height:100vh;height:100dvh;display:flex;flex-direction:column}.settingsContent{overflow:auto;flex:1;padding:16px 20px}.settingRow{display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;min-height:60px;text-align:left;border-bottom:1px solid var(--sel);font-size:16px}.settingRow .muted{max-width:55%;text-align:right}.toggle{position:relative;display:block;flex-shrink:0;width:40px;height:24px;border-radius:12px;border:1.5px solid #4d5157;background:transparent}.toggleDot{position:absolute;width:14px;height:14px;left:3.5px;top:3.5px;border-radius:50%;background:#4d5157}.toggle.on{background:#4d5157}.toggle.on .toggleDot{left:19.5px;background:#fff}#lastUpdated{margin:0;padding:0 0 18px;border-bottom:1px solid var(--sel)}#resetCurrencies{display:block;margin:45px auto 20px;min-height:52px;font-size:15px;color:var(--fg)}#version{text-align:center;margin:28px 0 12px}.settingsContent .check{margin-left:auto;color:var(--check)}
 
 #menu .settingsContent{display:flex;flex-direction:column}#version{margin-top:auto;padding-top:24px}.sourceCredits{text-align:center;font-size:10px}.sourceCredits a{color:var(--muted)}
+
+
+.decimalCategory,.decimalOption{width:100%;min-height:64px;font-size:17px;text-align:left;padding:0;display:flex;align-items:center;border:0;background:none}.decimalCategory{justify-content:space-between}.decimalCategory .muted{font-size:17px}.decimalOption{display:grid;grid-template-columns:70px 1fr 24px;gap:12px}.decimalExample{font-size:14px;color:var(--muted);text-align:center;font-variant-numeric:tabular-nums}.decimalOption .check{font-size:22px;color:var(--check);justify-self:end}
+@media(prefers-color-scheme:light){.toggle{border-color:#4d5157}.toggleDot{background:#4d5157}.toggle.on{background:#4d5157}.toggle.on .toggleDot{background:#fff}}
+
+.page:not(#home) header{justify-content:center}.headerSpacer{display:none}
+
+/* 仅主页金额：手动数字输入后用日夜主文字色，其余字体保持原色。 */
+#home #rows.edited .amount{color:var(--fg)}

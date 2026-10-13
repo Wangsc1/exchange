@@ -9,7 +9,7 @@
   <section id="keyboard" aria-label="计算键盘"></section>
 </main>
 <section id="detail" class="page hidden">
-  <header><button id="detailBack">‹ 返回</button><span>汇率详情</span><span class="headerSpacer" aria-hidden="true"></span></header>
+  <header><span>汇率详情</span></header>
   <div id="pair" class="pair"></div><div id="bigAmount"></div>
   <nav id="periods" aria-label="历史周期"></nav>
   <div id="historyStatus" class="muted" role="status"></div>
@@ -18,14 +18,16 @@
   <footer id="detailSource">数据源：Frankfurter · 欧洲央行（ECB）；日内：Yahoo Finance<br>1月及以上为 ECB 工作日日更；24时与 7天为 Yahoo Finance 市场行情（非官方接口，休市时停留在最近交易时段）。仅供参考，非交易、银行或卡组织报价。</footer>
 </section>
 <section id="selector" class="page hidden">
-  <header><button id="selectorBack">‹ 返回</button><h1 id="selectTitle">切换货币</h1><span class="headerSpacer" aria-hidden="true"></span></header>
+  <header><h1 id="selectTitle">切换货币</h1></header>
   <input id="search" type="search" placeholder="搜索中文 / 代码 / 国家地区" aria-label="搜索货币" autocomplete="off"><div id="currencyList"></div><div id="letterIndex" class="hidden" aria-label="拼音首字母快速定位"></div><div id="letterBubble" class="hidden"></div>
 </section>
 <section id="menu" class="page hidden">
-<header><button id="menuBack">‹ 返回</button><h1>换算设置</h1><span class="headerSpacer" aria-hidden="true"></span></header>
+<header><h1>换算设置</h1></header>
 <div class="settingsContent"><p id="lastUpdated" class="muted"></p><div id="settingRows"></div><button id="resetCurrencies">恢复默认币种列表</button><p class="muted sourceCredits">汇率提供：<a href="https://www.exchangerate-api.com" target="_blank" rel="noopener">ExchangeRate-API</a> · <a href="https://www.floatrates.com/json-feeds.html" target="_blank" rel="noopener">FloatRates</a><br>央行数据经 Frankfurter 交叉换算；开源汇率：fawazahmed0</p><p id="version" class="muted"></p></div>
 </section>
-<section id="choices" class="page hidden"><header><button id="choicesBack">‹ 返回</button><h1 id="choiceTitle"></h1><span class="headerSpacer" aria-hidden="true"></span></header><div id="choiceRows" class="settingsContent"></div></section>
+<section id="choices" class="page hidden"><header><h1 id="choiceTitle"></h1></header><div id="choiceRows" class="settingsContent"></div></section>
+<section id="decimalSettings" class="page hidden"><header><h1>小数点设置</h1></header><div class="settingsContent"><button id="fiatDecimals" class="decimalCategory"><span>法定货币</span><span class="muted"><span id="fiatDecimalsValue">2 位</span><span aria-hidden="true"> ›</span></span></button></div></section>
+<section id="decimalChoices" class="page hidden"><header><h1>法定货币</h1></header><div id="decimalChoiceRows" class="settingsContent" role="radiogroup" aria-label="法定货币小数位数"></div></section>
 <div id="toast" class="hidden" role="alert"></div>
 <script>/* 业务入口 */</script><script>/* 界面入口 */</script>
 </body></html>

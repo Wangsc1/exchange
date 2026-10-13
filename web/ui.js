@@ -2,7 +2,7 @@
 'use strict';
 const $ = id => document.getElementById(id);
 let settings = Core.normalizeSettings(null), fetchedAt = null, refreshToken = 0, settingsSaving = false;
-let config = Core.normalizeConfig(null), snapshot = null, expr = '100', fresh = true;
+let config = Core.normalizeConfig(null), snapshot = null, expr = '100', fresh = true, edited = false;
 let offline = false, warning = '', busy = false, page = 'home', toastTimer, saveQueue = Promise.resolve();
 let selection = null, detailBase = 'CNY', detailQuote = 'USD', detailAmount = 100, period = 1, historyToken = 0;
 // 原生处理函数不依赖 postMessage 返回值：原生完成后主动调用 window.__exchangeReply 回传结果。
@@ -20,22 +20,46 @@ function bridge(action, value) {
   });
 }
 function toast(message) { $('toast').textContent = message; $('toast').classList.remove('hidden'); clearTimeout(toastTimer); toastTimer = setTimeout(() => $('toast').classList.add('hidden'), 5500); }
-const entryDir = {};
-function show(target, dir = 'right') {
-  const leaving = page;
-  if (dir === 'back') dir = entryDir[leaving] === 'right' ? 'left' : 'right'; else entryDir[target] = dir;
-  page = target; for (const id of ['home', 'detail', 'selector', 'menu', 'choices']) $(id).classList.toggle('hidden', id !== target);
-  const el = $(target); el.classList.remove('enterLeft', 'enterRight'); void el.offsetWidth; el.classList.add(dir === 'left' ? 'enterLeft' : 'enterRight');
+const PAGE_IDS=['home','detail','selector','menu','choices','decimalSettings','decimalChoices'];
+let choiceField='source', choiceTitle='换算汇率源', needsRefresh=false;
+function sharedState(){return {config,settings,snapshot,expr,fresh,edited,offline,warning,fetchedAt,selection,detailBase,detailQuote,detailAmount,period,choiceField,choiceTitle,needsRefresh};}
+function publish(){return bridge('state',sharedState()).catch(()=>{});}
+function adopt(value){
+ if(!value)return;
+ config=Core.normalizeConfig(value.config);settings=Core.normalizeSettings(value.settings);
+ snapshot=value.snapshot?Core.validateSnapshot(value.snapshot):null;
+ expr=typeof value.expr==='string'?value.expr:numberText(config.amount);fresh=value.fresh!==false;edited=!!value.edited;
+ offline=!!value.offline;warning=value.warning||'';fetchedAt=value.fetchedAt||null;
+ selection=value.selection||null;detailBase=value.detailBase||'CNY';detailQuote=value.detailQuote||'USD';detailAmount=value.detailAmount??settings.defaultAmount;period=value.period||1;
+ choiceField=value.choiceField||'source';choiceTitle=value.choiceTitle||'换算汇率源';needsRefresh=!!value.needsRefresh;
+}
+function mount(){
+ for(const id of PAGE_IDS)$(id).classList.toggle('hidden',id!==page);
+ render();
+ if(page==='detail'&&snapshot)renderDetail();
+ if(page==='selector'){$('selectTitle').textContent=selection?.kind==='base'?'选择基准币种':selection?.kind==='quote'?'选择目标币种':'切换货币';renderSelector();}
+ if(page==='menu')renderSettings();
+ if(page==='choices')renderChoices(choiceField,choiceTitle);
+ if(page==='decimalSettings')renderDecimalSettings();
+ if(page==='decimalChoices')renderDecimalChoices();
+ if(needsRefresh&&(page==='menu'||page==='home')){needsRefresh=false;refresh();}
+}
+// 原生 pop/appear 后采用会话状态；无自绘页面transform，不参与系统交互手势。
+window.__exchangeResume=value=>{refreshToken++;historyToken++;busy=false;adopt(value);if(!snapshot&&(page==='home'||page==='menu'))needsRefresh=true;mount();};
+function show(target,dir='right'){
+ saveQueue.catch(()=>{}).then(()=>bridge('navigate',{page:target,back:dir==='back',state:{...sharedState(),needsRefresh:needsRefresh||(!snapshot&&(target==='menu'||target==='home'))}})).catch(e=>toast(e.message));
 }
 function numberText(n) { return n.toLocaleString('en-US', { useGrouping: false, maximumSignificantDigits: 15 }); }
 function formatted(n) { return n.toLocaleString('en-US', { minimumFractionDigits: settings.decimals, maximumFractionDigits: settings.decimals }); }
 function persist() {
+  publish();
   const value = { codes: [...config.codes], base: config.base, amount: config.amount };
   saveQueue = saveQueue.catch(() => {}).then(() => bridge('save', value)).catch(e => toast(e.message));
 }
 function element(tag, text, className) { const el = document.createElement(tag); if (text !== undefined) el.textContent = text; if (className) el.className = className; return el; }
 function currency(code) { return Core.CURRENCIES.find(c => c.code === code); }
 function renderRows() {
+  $('rows').classList.toggle('edited',edited);
   $('rows').replaceChildren();
   config.codes.forEach((code, index) => {
     const c = currency(code), row = element('div', undefined, 'row' + (code === config.base ? ' active' : ''));
@@ -81,7 +105,7 @@ function renderRows() {
       if (dragged) { dragged = false; return; }
       if (offset) { offset = 0; setOffset(0, true); return; }
       if (!snapshot) return toast('请先刷新取得汇率');
-      try { config = { ...config, base: code, amount: settings.defaultAmount }; expr = numberText(settings.defaultAmount); fresh = true; persist(); render(); } catch (e) { toast(e.message); }
+      try { config = { ...config, base: code, amount: settings.defaultAmount }; expr = numberText(settings.defaultAmount); fresh = true; edited = false; persist(); render(); } catch (e) { toast(e.message); }
     };
     row.append(swap, info, content); $('rows').append(row);
   });
@@ -97,10 +121,14 @@ async function refresh() {
   snapshot = null; warning = ''; render();
   try { const r = await bridge('latest', key); if(token !== refreshToken)return; snapshot = Core.validateSnapshot(r.value); offline = r.offline; warning = r.warning; fetchedAt = r.fetchedAt || null; if (warning) toast(warning); }
   catch (e) { if(token !== refreshToken)return; warning = e.message; toast(e.message); }
-  finally { if(token === refreshToken){busy = false; render(); renderSettings();} }
+  finally { if(token === refreshToken){busy = false; render(); renderSettings();publish();} }
 }
 
+function restoreDefaultAmount(){config.amount=settings.defaultAmount;expr=numberText(config.amount);fresh=true;edited=false;persist();render();}
 function input(key) {
+  // keyInput 的零占位不能用于判断删空：先查看退格后的原始表达式是否还含数字。
+  if(key==='AC'||(key==='⌫'&&!/[0-9]/.test(expr.slice(0,-1)))){restoreDefaultAmount();return;}
+  if(/^[0-9.]$/.test(key))edited=true;
   if (key === '=') { try { config.amount = Core.calculate(expr); expr = numberText(config.amount); fresh = true; persist(); render(); } catch (e) { toast(e.message); } return; }
   if (fresh && /^[0-9.]$/.test(key)) expr = '0';
   fresh = false; expr = Core.keyInput(expr, key);
@@ -159,7 +187,7 @@ function renderSelector() {
           if (selection.kind === 'row') { config = Core.replaceCurrency(config, selection.index, c.code, snapshot); expr = numberText(config.amount); fresh = true; persist(); render(); }
           else if (selection.kind === 'base') { detailAmount = settings.defaultAmount; detailBase = c.code; }
           else detailQuote = c.code;
-          show(selection.back, 'back'); if (selection.back === 'detail') renderDetail();
+          show(selection.back, 'back');
         } catch (e) { toast(e.message); }
       };
       $('currencyList').append(b);
@@ -168,11 +196,9 @@ function renderSelector() {
   if (!found.length) $('currencyList').append(element('p', '没有匹配的可用法币', 'muted'));
 }
 $('search').oninput = renderSelector;
-function dismissSelector() { $('letterIndex').classList.add('hidden'); $('letterBubble').classList.add('hidden'); show(selection?.back || 'home', 'back'); }
-$('selectorBack').onclick = dismissSelector;
 function openDetail(code) {
   if (!snapshot) return toast('请先取得汇率');
-  try { detailBase = code; detailAmount = settings.defaultAmount; detailQuote = code === 'USD' ? 'CNY' : 'USD'; show('detail', 'right'); renderDetail(); } catch (e) { toast(e.message); }
+  try { detailBase = code; detailAmount = settings.defaultAmount; detailQuote = code === 'USD' ? 'CNY' : 'USD'; show('detail', 'right'); } catch (e) { toast(e.message); }
 }
 function renderDetail() {
   const base = currency(detailBase), quote = currency(detailQuote); $('pair').replaceChildren();
@@ -181,7 +207,7 @@ function renderDetail() {
   $('pair').append(b, element('span',' → '), q);
   $('bigAmount').textContent = formatted(Core.convert(detailAmount, detailBase, detailQuote, snapshot));
   $('periods').replaceChildren();
-  Core.PERIODS.forEach(p => { const button = element('button',p.label,p.days === period ? 'active' : ''); button.onclick = () => { period = p.days; renderDetail(); }; $('periods').append(button); });
+  Core.PERIODS.forEach(p => { const button = element('button',p.label,p.days === period ? 'active' : ''); button.onclick = () => { period = p.days;publish(); renderDetail(); }; $('periods').append(button); });
   $('detailSource').textContent = `换算来源：${Core.SOURCES.find(s=>s.key===settings.source).name}；${snapshot.date}。历史走势：ECB（1月及以上）；24时/7天：Yahoo Finance 非官方日内行情。仅供参考，非交易或银行报价。`;
   loadHistory();
 }
@@ -215,21 +241,13 @@ function chart(records,stats) {
   else $('chart').append(svg('circle',{cx:points[0][0],cy:points[0][1],r:'3',fill:'#ef2c73'}));
   const title=svg('title',{});title.textContent=`${records[0].base}兑${records[0].quote}，${records[0].date}至${records[records.length-1].date}，最低${stats.low}，最高${stats.high}`;$('chart').prepend(title);
 }
-$('detailBack').onclick = () => { historyToken++; show('home', 'back'); };
-async function start(){render();try{config=Core.normalizeConfig(await bridge('config'));settings=Core.normalizeSettings(await bridge('settings'));expr=numberText(config.amount);render();}catch(e){toast(e.message);}await refresh();}
-start();
-// 每次进入都自动刷新：启动时一次；App 从后台回到前台时再刷新（距上次成功刷新超过 20 秒，避免频繁请求）。
-let lastRefresh = Date.now();
-document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && Date.now() - lastRefresh > 20000) { lastRefresh = Date.now(); refresh(); } });
-
-// 子页面支持从屏幕左边缘向右滑返回；命中区为左边缘 28px，水平位移超过 70px 且大于竖向位移时触发。
-{
-  let sx = 0, sy = 0, tracking = false;
-  const back = () => { if (page === 'detail') $('detailBack').click(); else if (page === 'selector') $('selectorBack').click(); else if (page === 'menu') $('menuBack').click(); else if (page === 'choices') $('choicesBack').click(); };
-  document.addEventListener('touchstart', e => { const t = e.touches[0]; tracking = page !== 'home' && e.touches.length === 1 && t.clientX <= 28; sx = t.clientX; sy = t.clientY; }, { passive: true });
-  document.addEventListener('touchend', e => { if (!tracking) return; tracking = false; const t = e.changedTouches[0], dx = t.clientX - sx, dy = Math.abs(t.clientY - sy); if (dx > 70 && dx > dy * 1.5) back(); }, { passive: true });
-  document.addEventListener('touchcancel', () => { tracking = false; }, { passive: true });
+async function start(){
+ const boot=window.__exchangeBoot||{page:'home',state:null};page=boot.page;adopt(boot.state);mount();
+ if(!boot.state){try{config=Core.normalizeConfig(await bridge('config'));settings=Core.normalizeSettings(await bridge('settings'));expr=numberText(config.amount);mount();}catch(e){toast(e.message);}await refresh();}
 }
+start();
+let lastRefresh=Date.now();
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&page==='home'&&Date.now()-lastRefresh>20000){lastRefresh=Date.now();refresh();}});
 
 function updatedText() {
  if(!fetchedAt)return '上次更新 暂无成功记录';
@@ -242,27 +260,43 @@ function renderSettings(){
  const box=$('settingRows');box.replaceChildren();
  for(const [field,label] of [['symbols','货币符号'],['showSource','显示换算汇率源']]){
   const b=element('button',undefined,'settingRow');b.id=field;b.setAttribute('role','switch');b.setAttribute('aria-checked',String(settings[field]));
-  b.append(element('span',label),element('span',settings[field]?'开启':'关闭','toggle '+(settings[field]?'on':'')));
+  const toggle=element('span',undefined,'toggle '+(settings[field]?'on':''));toggle.setAttribute('aria-hidden','true');toggle.append(element('span',undefined,'toggleDot'));
+  b.append(element('span',label),toggle);
   b.onclick=()=>updateSettings(field,!settings[field]);box.append(b);
  }
- for(const [field,label,value] of [['source','换算汇率源',Core.SOURCES.find(s=>s.key===settings.source).name],['defaultAmount','货币默认值',settings.defaultAmount.toLocaleString('en-US')],['decimals','小数点位数',settings.decimals+' 位']]){
-  const b=element('button',undefined,'settingRow');b.id='setting-'+field;b.append(element('span',label),element('span',value+' ›','muted'));b.onclick=()=>openChoices(field,label);box.append(b);
+ for(const [field,label,value] of [['source','换算汇率源',Core.SOURCES.find(s=>s.key===settings.source).name],['defaultAmount','货币默认值',settings.defaultAmount.toLocaleString('en-US')],['decimals','小数点位数',decimalLabel(settings.decimals)]]){
+  const b=element('button',undefined,'settingRow');b.id='setting-'+field;b.append(element('span',label),element('span',value+' ›','muted'));b.onclick=()=>field==='decimals'?openDecimalSettings():openChoices(field,label);box.append(b);
  }
 }
 async function updateSettings(field,value){
  if(settingsSaving)return;settingsSaving=true;
- const buttons=[...document.querySelectorAll('#settingRows button, #choiceRows button')];buttons.forEach(b=>b.disabled=true);
+ const buttons=[...document.querySelectorAll('#settingRows button, #choiceRows button, #decimalChoiceRows button')];buttons.forEach(b=>b.disabled=true);
  const next={...settings,[field]:value};
- try{await bridge('saveSettings',next);settings=Core.normalizeSettings(next);renderSettings();render();if(field==='source'){show('menu','back');fetchedAt=null;await refresh();}else if(page==='choices')show('menu','back');}
+ try{await bridge('saveSettings',next);settings=Core.normalizeSettings(next);renderSettings();render();if(field==='source'){snapshot=null;fetchedAt=null;needsRefresh=true;show('menu','back');}else if(page==='decimalChoices'){show('decimalSettings','back');}else if(page==='choices')show('menu','back');else await publish();}
  catch(e){toast(e.message);}
  finally{settingsSaving=false;buttons.forEach(b=>b.disabled=false);}
 }
-function openChoices(field,title){
+function renderChoices(field,title){
  $('choiceTitle').textContent=title;const box=$('choiceRows');box.replaceChildren();
- const items=field==='source'?Core.SOURCES.map(s=>[s.key,s.name,s.description]):(field==='defaultAmount'?[1,10,100,1000,10000]:[0,1,2,3,4,5,6,7,8]).map(v=>[v,v.toLocaleString('en-US')+(field==='decimals'?' 位':''),'']);
+ const items=field==='source'?Core.SOURCES.map(s=>[s.key,s.name,s.description]):[1,10,100,1000,10000].map(v=>[v,v.toLocaleString('en-US'),'']);
  for(const [value,label,desc] of items){const b=element('button',undefined,'currency');b.setAttribute('role','radio');b.setAttribute('aria-checked',String(settings[field]===value));const labels=element('span',undefined,'labels');labels.append(element('span',label));if(desc)labels.append(element('small',desc));b.append(labels,element('span',settings[field]===value?'✓':'','check'));b.onclick=()=>updateSettings(field,value);box.append(b);}
- box.setAttribute('role','radiogroup');box.setAttribute('aria-label',title);show('choices');
+ box.setAttribute('role','radiogroup');box.setAttribute('aria-label',title);
 }
+function openChoices(field,title){choiceField=field;choiceTitle=title;show('choices');}
+function decimalLabel(value){return value===0?'无':value+' 位';}
+function renderDecimalSettings(){
+ $('fiatDecimalsValue').textContent=decimalLabel(settings.decimals);
+}
+function openDecimalSettings(){renderDecimalSettings();show('decimalSettings');}
+function renderDecimalChoices(){
+ const box=$('decimalChoiceRows');box.replaceChildren();
+ for(const value of [0,2,4,6,8]){
+  const b=element('button',undefined,'decimalOption');b.dataset.value=String(value);b.setAttribute('role','radio');b.setAttribute('aria-checked',String(settings.decimals===value));
+  b.append(element('span',decimalLabel(value),'decimalLabel'),element('span',(1234).toLocaleString('en-US',{minimumFractionDigits:value,maximumFractionDigits:value}),'decimalExample'),element('span',settings.decimals===value?'✓':'','check'));
+  b.onclick=()=>updateSettings('decimals',value);box.append(b);
+ }
+}
+function openDecimalChoices(){show('decimalChoices');}
+$('fiatDecimals').onclick=openDecimalChoices;
 $('settings').onclick=()=>{renderSettings();show('menu');};
-$('menuBack').onclick=()=>show('home','back');$('choicesBack').onclick=()=>show('menu','back');
-$('resetCurrencies').onclick=()=>{if(!confirm('恢复默认币种列表？将恢复 USD、CNY、CAD、EUR、GBP、AUD，并以人民币为基准。'))return;config={codes:[...Core.DEFAULT_CODES],base:'CNY',amount:settings.defaultAmount};expr=numberText(config.amount);fresh=true;persist();render();toast('已恢复默认币种列表');};
+$('resetCurrencies').onclick=()=>{if(!confirm('恢复默认币种列表？将恢复 USD、CNY、CAD、EUR、GBP、AUD，并以人民币为基准。'))return;config={codes:[...Core.DEFAULT_CODES],base:'CNY',amount:settings.defaultAmount};expr=numberText(config.amount);fresh=true;edited=false;persist();render();toast('已恢复默认币种列表');};

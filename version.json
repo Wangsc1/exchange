@@ -1,10 +1,11 @@
 {
-  "version": "1.1.0",
-  "notes": "新增换算设置、多汇率源与独立缓存；支持默认金额、小数位和显示开关；删除应用内更新，改用 Scripting 长按更新。",
+  "version": "1.2.0",
+  "notes": "迁移原生导航栈，移除自绘返回和边缘手势，隐藏系统返回按钮；仅主页金额数字输入后亮色，AC及退格删空恢复货币默认值和灰色。原生右滑待真机验收。",
   "files": [
     "index.tsx",
     "core.ts",
     "service.ts",
+    "navigation.ts",
     "web/index.html",
     "web/style.css",
     "web/ui.js",
