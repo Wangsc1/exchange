@@ -51,7 +51,18 @@ function renderRows() {
       event.preventDefault(); offset = Math.max(-row.clientWidth / 2, Math.min(row.clientWidth / 2, startOffset + dx));
       content.style.transition = 'none'; content.style.transform = `translateX(${offset}px)`;
     };
-    content.onpointerup = () => { if (moving) { offset = Math.abs(offset) > 45 ? Math.sign(offset) * row.clientWidth / 2 : 0; content.style.transition = ''; content.style.transform = `translateX(${offset}px)`; } moving = false; };
+    content.onpointerup = () => {
+      if (moving) {
+        const max = row.clientWidth / 2;
+        if (Math.abs(offset) >= max * 0.9) {
+          // 滑到底：松手后自动打开对应页面，并让行恢复原位。
+          const action = offset > 0 ? () => openSelector({ kind: 'row', index, back: 'home' }) : () => openDetail(code);
+          offset = 0; content.style.transition = ''; content.style.transform = ''; moving = false; action(); return;
+        }
+        offset = Math.abs(offset) > 45 ? Math.sign(offset) * max : 0; content.style.transition = ''; content.style.transform = `translateX(${offset}px)`;
+      }
+      moving = false;
+    };
     content.onpointercancel = () => { moving = false; offset = 0; content.style.transition = ''; content.style.transform = ''; };
     content.onclick = () => {
       if (dragged) { dragged = false; return; }

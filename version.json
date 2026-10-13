@@ -1,5 +1,5 @@
 {
-  "version": "1.0.3",
-  "notes": "修复保存配置误报；键盘底部同色；右上角刷新和设置图标统一大小。",
+  "version": "1.0.4",
+  "notes": "左滑或右滑到底后松手，自动打开汇率详情或切换货币页面。",
   "files": ["index.tsx", "core.ts", "service.ts", "update.ts", "web/index.html", "web/style.css", "web/ui.js", "web/core.js"]
 }
