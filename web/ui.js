@@ -43,7 +43,8 @@ function show(target,dir='right'){
  page=target;mount();
  for(const id of PAGE_IDS)$(id).classList.remove('enterLeft','enterRight');
  // 设置相关页面不叠加回弹，只在三个主页面之间保留原进入动画。
- if(['home','detail','selector'].includes(leaving)&&['home','detail','selector'].includes(target)){
+ // 例外：从设置返回主页也使用回弹动画。
+ if((['home','detail','selector'].includes(leaving)&&['home','detail','selector'].includes(target))||(leaving==='menu'&&target==='home')){
   void $(target).offsetWidth;$(target).classList.add(dir==='left'?'enterLeft':'enterRight');
  }
 }
