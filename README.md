@@ -1,6 +1,6 @@
 # 汇率
 
-面向 **iPhone Scripting App**（不是 Scriptable）的法币参考汇率工具。当前 **1.3.14**。仅供参考，不是实时成交价、银行或银行卡结算报价，不提供数字货币。
+面向 **iPhone Scripting App**（不是 Scriptable）的法币参考汇率工具。当前 **1.4.0**。仅供参考，不是实时成交价、银行或银行卡结算报价，不提供数字货币。
 
 ## 页面与返回方式
 
@@ -31,18 +31,26 @@
 - **货币默认值**：1/10/100/1,000/10,000，默认100；影响后续基准点击、详情基准金额、恢复列表及AC/删空，不擅自改动正在输入的金额。
 - **小数点位数**：设置→「小数点设置」→「法定货币」。新选项仅无（0）/2/4/6/8位，行高64px、标签17px、灰色示例14px（`1,234`、`1,234.00`等）、右侧对勾，无卡片边框。保存后返回小数点设置，当前值即时同步。旧合法0–8位（含奇数）保留至主动新选，默认仍2位，不静默重置。主页/详情金额及最高最低平均按该位数显示，涨跌百分比仍4位。
 - **恢复默认币种列表**需confirm二次确认，恢复默认六币、基准CNY和当前默认金额，不重置其余设置或缓存。
-- 设置底部「汇率 版本 1.3.14」来自core.ts VERSION。
+- 设置底部「汇率 版本 1.4.0」来自core.ts VERSION。
 
 没有当地货币开关：Intl/navigator.language不能可靠读取系统货币，故不猜测、不修改配置。没有更多设置或数字货币设置，不扩大行情范围。
 
 ## 数据源与条款
 
-仅保留 `core.ts CURRENCIES` 内30种法币，可选币种与实际快照取交集。快照统一为 `{date,rates:每EUR兑换}`，金额按 `金额÷基准每EUR报价×目标每EUR报价` 交叉换算。缺默认六币之一即报错，只回退本源真实缓存，不把请求时间冒充报价日期，不把任何源称为实时。
+`core.ts CURRENCIES` 收录约160种法币，以及BTC、ETH、USDT等8种加密货币和黄金、白银、铂金、钯金；可选币种与所选来源实际返回的快照取交集，来源没有的币种不会出现，也不会用其他来源补齐。加密货币与贵金属仅 fawaz 开源源提供，非央行汇率。快照统一为 `{date,rates:每EUR兑换}`，金额按 `金额÷基准每EUR报价×目标每EUR报价` 交叉换算。缺默认六币之一即报错，只回退本源真实缓存，不把请求时间冒充报价日期，不把任何源称为实时。
 
 | key | 来源/公开接口 | 频率、访问与使用边界 |
 |---|---|---|
 | ecb（默认） | Frankfurter ECB：`https://api.frankfurter.dev/v2/rates?providers=ECB&base=EUR` | 欧洲央行参考汇率，工作日更新；[ECB使用说明](https://www.ecb.europa.eu/services/using-our-site/disclaimer/html/index.en.html)要求准确引用和署名。 |
 | boc | Frankfurter BOC：同一 `/rates?providers=BOC&base=EUR` | 加拿大央行指示汇率，工作日更新，覆盖工具法币23种，日期可能较ECB落后。[条款](https://www.bankofcanada.ca/terms/)允许免费使用/复制/分发，要求署名、说明修改；本工具标明交叉换算，不用央行logo、不宣称背书。 |
+| bdi | Frankfurter BDI：`/rates?providers=BDI&base=EUR` | 意大利银行每日汇率，约150种法币，工作日更新；只取最新日期。 |
+| nbp | Frankfurter NBP：`/rates?providers=NBP&base=EUR` | 波兰国家银行平均汇率；响应混有旧日期行，只取最新日期，目录内约32种。 |
+| cbkkw | Frankfurter CBKKW：`/rates?providers=CBKKW&base=EUR` | 科威特央行参考汇率，约130种，含海湾币种。 |
+| lb | Frankfurter LB：`/rates?providers=LB&base=EUR` | 立陶宛银行每日汇率，约30种。 |
+| nbu | Frankfurter NBU：`/rates?providers=NBU&base=EUR` | 乌克兰国家银行官方汇率，约41种。 |
+| boe | Frankfurter BOE：`/rates?providers=BOE&base=EUR` | 英格兰银行现货汇率，约27种，日期可能比其他源晚一天。 |
+| amcm | Frankfurter AMCM：`/rates?providers=AMCM&base=EUR` | 澳门金管局银行间中间价，含澳门币，约18种。 |
+| mas | Frankfurter MAS：`/rates?providers=MAS&base=EUR` | 新加坡金管局汇率，约22种。 |
 | er | `https://open.er-api.com/v6/latest/EUR` | ExchangeRate-API开放端点，166币种、每日更新；[免费说明](https://www.exchangerate-api.com/docs/free)允许个人/商业换算与缓存，要求署名/限频，禁止再分发原始数据。设置页永久提供方链接，无原始数据下载；一小时内最多尝试一次（含失败）。[条款](https://www.exchangerate-api.com/terms)。 |
 | fawaz-cdn | `https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/eur.json` | [开源项目](https://github.com/fawazahmed0/exchange-api)免费、每日更新，[CC0](https://github.com/fawazahmed0/exchange-api/blob/main/LICENSE)。CDN日期可滞后，原始小写代码含加密/金属/旧币，生产仅法币白名单。 |
 | fawaz-pages | `https://latest.currency-api.pages.dev/v1/currencies/eur.json` | 同一开源项目Cloudflare端点，每日数据；与CDN独立选择/缓存，可能日期不同，不混合报价。 |
@@ -52,7 +60,7 @@
 | inforeuro | [欧盟委员会 InforEuro](https://commission.europa.eu/funding-and-tenders/procedures-guidelines-tenders/information-contractors-and-beneficiaries/exchange-rate-inforeuro_en)，官方 `https://ec.europa.eu/budg/inforeuro/api/public/monthly-rates?year=2026&month=10`（运行时请求UTC当前月） | **月度会计汇率，不是日更/实时汇率**，每EUR直接报价；适用于报销等会计换算，官方说明通常取上月倒数第二日市场参考价。本工具日期为请求成功的适用月份首日，非取数日、发布日期或该日市场报价；未发布期错误不伪造数据。[欧盟法律声明](https://commission.europa.eu/legal-notice_en)：通常CC BY 4.0，须署名并说明修改；本工具署名并注明每EUR转换。 |
 | cbr | [俄罗斯央行官方汇率](https://www.cbr.ru/eng/currency_base/daily/)，XML `https://www.cbr.ru/scripts/XML_daily.asp` | 官方[XML接口说明](https://www.cbr.ru/development/SXML/)：无date_req返回最新登记日；每日官方汇率，**日期是生效日，可能在查询日之后**，央行不承诺按此买卖外币。[网站使用协议](https://www.cbr.ru/eng/user_agreement/)要求使用材料需权利人同意并附官网链接。提供XML访问不等于已经取得商业/公开再分发授权；未取得额外许可。 |
 
-SAFE/H.10/InforEuro/CBR直接连接官方；ECB/BOC经Frankfurter取得，不重复添加，不混合报价。
+SAFE/H.10/InforEuro/CBR直接连接官方；ECB、BOC及BDI、NBP、CBKKW、LB、NBU、BOE、AMCM、MAS经Frankfurter取得，不混合报价。IMF源因最新日期只有约30种且缺默认币，未接入。
 
 ### 单位、方向与日期
 
@@ -96,7 +104,7 @@ Frankfurter免费API仍遵守各提供方条款。不保证SLA和交易准确性
 
 使用当前Scripting App。[一键导入](https://scripting.fun/import_scripts?urls=["https%3A%2F%2Fgithub.com%2FWangsc1%2Fexchange"])；更新用 **Scripting自带长按更新或一键导入**，保留 `script.json.remoteResource.url`，无应用内更新、无update.ts。
 
-本地导入需 `script.json`、`index.tsx`、`core.ts`、`service.ts`及完整 `web/`。core/script/version三处同步1.3.14，version.json保留中文摘要和文件清单。
+本地导入需 `script.json`、`index.tsx`、`core.ts`、`service.ts`及完整 `web/`。core/script/version三处同步1.4.0，version.json保留中文摘要和文件清单。
 
 ## 开发与验证
 
@@ -114,7 +122,7 @@ check严格检查纯业务、入口语法、共享构建一致性及版本；宿
 
 ## 币种目录
 
-core.CURRENCIES固定为 **30种法币**：USD、CNY、CAD、EUR、GBP、AUD、BRL、CHF、CZK、DKK、HKD、HUF、IDR、ILS、INR、ISK、JPY、KRW、MXN、MYR、NOK、NZD、PHP、PLN、RON、SEK、SGD、THB、TRY、ZAR。
+core.CURRENCIES 原为30种法币，现扩充为约160种法币加8种加密货币、4种贵金属；原30种为：USD、CNY、CAD、EUR、GBP、AUD、BRL、CHF、CZK、DKK、HKD、HUF、IDR、ILS、INR、ISK、JPY、KRW、MXN、MYR、NOK、NZD、PHP、PLN、RON、SEK、SGD、THB、TRY、ZAR。
 
 所有源只保留该目录，选择页再取实际快照交集。上游包含更多币种不意味着本工具全部展示。常用与字母分组可能重复展示同一币，应按唯一代码计数。
 

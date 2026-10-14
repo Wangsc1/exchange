@@ -2,7 +2,7 @@
 const Core = (() => { const exports = {};
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.SOURCES = exports.VERSION = exports.PERIODS = exports.CURRENCIES = exports.DEFAULT_CODES = void 0;
+exports.SOURCES = exports.VERSION = exports.PERIODS = exports.NON_FIAT = exports.CURRENCIES = exports.DEFAULT_CODES = void 0;
 exports.flag = flag;
 exports.search = search;
 exports.validDate = validDate;
@@ -32,9 +32,136 @@ exports.DEFAULT_CODES = ['USD', 'CNY', 'CAD', 'EUR', 'GBP', 'AUD'];
 // 当前 ECB 常规发布的法币；没有行情的币种不会出现在选择列表中。
 exports.CURRENCIES = [
     ['USD', '美元', '美国', 'US', '$'], ['CNY', '人民币', '中国', 'CN', '¥'], ['CAD', '加元', '加拿大', 'CA', '$'], ['EUR', '欧元', '欧盟 欧元区 德国 法国 意大利 西班牙', 'EU', '€'], ['GBP', '英镑', '英国', 'GB', '£'], ['AUD', '澳元', '澳大利亚', 'AU', '$'],
-    ['BRL', '巴西雷亚尔', '巴西', 'BR', 'R$'], ['CHF', '瑞士法郎', '瑞士 列支敦士登', 'CH', 'CHF'], ['CZK', '捷克克朗', '捷克', 'CZ', 'Kč'], ['DKK', '丹麦克朗', '丹麦', 'DK', 'kr'], ['HKD', '港元', '中国香港', 'HK', '$'], ['HUF', '匈牙利福林', '匈牙利', 'HU', 'Ft'], ['IDR', '印尼盾', '印度尼西亚', 'ID', 'Rp'], ['ILS', '以色列新谢克尔', '以色列', 'IL', '₪'], ['INR', '印度卢比', '印度', 'IN', '₹'], ['ISK', '冰岛克朗', '冰岛', 'IS', 'kr'], ['JPY', '日元', '日本', 'JP', '¥'], ['KRW', '韩元', '韩国', 'KR', '₩'], ['MXN', '墨西哥比索', '墨西哥', 'MX', '$'], ['MYR', '马来西亚林吉特', '马来西亚', 'MY', 'RM'], ['NOK', '挪威克朗', '挪威', 'NO', 'kr'], ['NZD', '新西兰元', '新西兰', 'NZ', '$'], ['PHP', '菲律宾比索', '菲律宾', 'PH', '₱'], ['PLN', '波兰兹罗提', '波兰', 'PL', 'zł'], ['RON', '罗马尼亚列伊', '罗马尼亚', 'RO', 'Lei'], ['SEK', '瑞典克朗', '瑞典', 'SE', 'kr'], ['SGD', '新加坡元', '新加坡', 'SG', '$'], ['THB', '泰铢', '泰国', 'TH', '฿'], ['TRY', '土耳其里拉', '土耳其', 'TR', '₺'], ['ZAR', '南非兰特', '南非', 'ZA', 'R']
+    ['BRL', '巴西雷亚尔', '巴西', 'BR', 'R$'], ['CHF', '瑞士法郎', '瑞士 列支敦士登', 'CH', 'CHF'], ['CZK', '捷克克朗', '捷克', 'CZ', 'Kč'], ['DKK', '丹麦克朗', '丹麦', 'DK', 'kr'], ['HKD', '港元', '中国香港', 'HK', '$'], ['HUF', '匈牙利福林', '匈牙利', 'HU', 'Ft'], ['IDR', '印尼盾', '印度尼西亚', 'ID', 'Rp'], ['ILS', '以色列新谢克尔', '以色列', 'IL', '₪'], ['INR', '印度卢比', '印度', 'IN', '₹'], ['ISK', '冰岛克朗', '冰岛', 'IS', 'kr'], ['JPY', '日元', '日本', 'JP', '¥'], ['KRW', '韩元', '韩国', 'KR', '₩'], ['MXN', '墨西哥比索', '墨西哥', 'MX', '$'], ['MYR', '马来西亚林吉特', '马来西亚', 'MY', 'RM'], ['NOK', '挪威克朗', '挪威', 'NO', 'kr'], ['NZD', '新西兰元', '新西兰', 'NZ', '$'], ['PHP', '菲律宾比索', '菲律宾', 'PH', '₱'], ['PLN', '波兰兹罗提', '波兰', 'PL', 'zł'], ['RON', '罗马尼亚列伊', '罗马尼亚', 'RO', 'Lei'], ['SEK', '瑞典克朗', '瑞典', 'SE', 'kr'], ['SGD', '新加坡元', '新加坡', 'SG', '$'], ['THB', '泰铢', '泰国', 'TH', '฿'], ['TRY', '土耳其里拉', '土耳其', 'TR', '₺'], ['ZAR', '南非兰特', '南非', 'ZA', 'R'],
+    // 以下币种仅在所选来源实际提供时出现在选择列表。
+    ['AED', '阿联酋迪拉姆', '阿联酋', 'AE', 'د.إ'],
+    ['AFN', '阿富汗尼', '阿富汗', 'AF', '؋'],
+    ['ALL', '阿尔巴尼亚列克', '阿尔巴尼亚', 'AL', 'L'],
+    ['AMD', '亚美尼亚德拉姆', '亚美尼亚', 'AM', '֏'],
+    ['AOA', '安哥拉宽扎', '安哥拉', 'AO', 'Kz'],
+    ['ARS', '阿根廷比索', '阿根廷', 'AR', '$'],
+    ['AWG', '阿鲁巴弗罗林', '阿鲁巴', 'AW', 'ƒ'],
+    ['AZN', '阿塞拜疆马纳特', '阿塞拜疆', 'AZ', '₼'],
+    ['BAM', '波黑可兑换马克', '波斯尼亚和黑塞哥维那', 'BA', 'KM'],
+    ['BBD', '巴巴多斯元', '巴巴多斯', 'BB', '$'],
+    ['BDT', '孟加拉塔卡', '孟加拉国', 'BD', '৳'],
+    ['BHD', '巴林第纳尔', '巴林', 'BH', '.د.ب'],
+    ['BIF', '布隆迪法郎', '布隆迪', 'BI', 'FBu'],
+    ['BMD', '百慕大元', '百慕大', 'BM', '$'],
+    ['BND', '文莱元', '文莱', 'BN', '$'],
+    ['BOB', '玻利维亚诺', '玻利维亚', 'BO', 'Bs'],
+    ['BSD', '巴哈马元', '巴哈马', 'BS', '$'],
+    ['BTN', '不丹努尔特鲁姆', '不丹', 'BT', 'Nu.'],
+    ['BWP', '博茨瓦纳普拉', '博茨瓦纳', 'BW', 'P'],
+    ['BZD', '伯利兹元', '伯利兹', 'BZ', '$'],
+    ['CDF', '刚果法郎', '刚果民主共和国', 'CD', 'FC'],
+    ['CLP', '智利比索', '智利', 'CL', '$'],
+    ['COP', '哥伦比亚比索', '哥伦比亚', 'CO', '$'],
+    ['CRC', '哥斯达黎加科朗', '哥斯达黎加', 'CR', '₡'],
+    ['CUP', '古巴比索', '古巴', 'CU', '$'],
+    ['CVE', '佛得角埃斯库多', '佛得角', 'CV', '$'],
+    ['DJF', '吉布提法郎', '吉布提', 'DJ', 'Fdj'],
+    ['DOP', '多米尼加比索', '多米尼加', 'DO', '$'],
+    ['DZD', '阿尔及利亚第纳尔', '阿尔及利亚', 'DZ', 'دج'],
+    ['EGP', '埃及镑', '埃及', 'EG', 'E£'],
+    ['ERN', '厄立特里亚纳克法', '厄立特里亚', 'ER', 'Nfk'],
+    ['ETB', '埃塞俄比亚比尔', '埃塞俄比亚', 'ET', 'Br'],
+    ['FJD', '斐济元', '斐济', 'FJ', '$'],
+    ['FKP', '福克兰群岛镑', '福克兰群岛', 'FK', '£'],
+    ['GEL', '格鲁吉亚拉里', '格鲁吉亚', 'GE', '₾'],
+    ['GHS', '加纳塞地', '加纳', 'GH', '₵'],
+    ['GIP', '直布罗陀镑', '直布罗陀', 'GI', '£'],
+    ['GMD', '冈比亚达拉西', '冈比亚', 'GM', 'D'],
+    ['GNF', '几内亚法郎', '几内亚', 'GN', 'FG'],
+    ['GTQ', '危地马拉格查尔', '危地马拉', 'GT', 'Q'],
+    ['GYD', '圭亚那元', '圭亚那', 'GY', '$'],
+    ['HNL', '洪都拉斯伦皮拉', '洪都拉斯', 'HN', 'L'],
+    ['HTG', '海地古德', '海地', 'HT', 'G'],
+    ['IQD', '伊拉克第纳尔', '伊拉克', 'IQ', 'ع.د'],
+    ['IRR', '伊朗里亚尔', '伊朗', 'IR', '﷼'],
+    ['JMD', '牙买加元', '牙买加', 'JM', '$'],
+    ['JOD', '约旦第纳尔', '约旦', 'JO', 'د.ا'],
+    ['KES', '肯尼亚先令', '肯尼亚', 'KE', 'KSh'],
+    ['KGS', '吉尔吉斯斯坦索姆', '吉尔吉斯斯坦', 'KG', 'с'],
+    ['KHR', '柬埔寨瑞尔', '柬埔寨', 'KH', '៛'],
+    ['KMF', '科摩罗法郎', '科摩罗', 'KM', 'CF'],
+    ['KPW', '朝鲜元', '朝鲜', 'KP', '₩'],
+    ['KWD', '科威特第纳尔', '科威特', 'KW', 'د.ك'],
+    ['KYD', '开曼群岛元', '开曼群岛', 'KY', '$'],
+    ['KZT', '哈萨克斯坦坚戈', '哈萨克斯坦', 'KZ', '₸'],
+    ['LAK', '老挝基普', '老挝', 'LA', '₭'],
+    ['LBP', '黎巴嫩镑', '黎巴嫩', 'LB', 'ل.ل'],
+    ['LKR', '斯里兰卡卢比', '斯里兰卡', 'LK', 'Rs'],
+    ['LRD', '利比里亚元', '利比里亚', 'LR', '$'],
+    ['LSL', '莱索托洛蒂', '莱索托', 'LS', 'L'],
+    ['LYD', '利比亚第纳尔', '利比亚', 'LY', 'ل.د'],
+    ['MAD', '摩洛哥迪拉姆', '摩洛哥', 'MA', 'د.م.'],
+    ['MDL', '摩尔多瓦列伊', '摩尔多瓦', 'MD', 'L'],
+    ['MGA', '马达加斯加阿里亚里', '马达加斯加', 'MG', 'Ar'],
+    ['MKD', '北马其顿代纳尔', '北马其顿', 'MK', 'ден'],
+    ['MMK', '缅甸缅元', '缅甸', 'MM', 'K'],
+    ['MNT', '蒙古图格里克', '蒙古', 'MN', '₮'],
+    ['MOP', '澳门币', '中国澳门', 'MO', 'MOP$'],
+    ['MRU', '毛里塔尼亚乌吉亚', '毛里塔尼亚', 'MR', 'UM'],
+    ['MUR', '毛里求斯卢比', '毛里求斯', 'MU', '₨'],
+    ['MVR', '马尔代夫拉菲亚', '马尔代夫', 'MV', 'Rf'],
+    ['MWK', '马拉维克瓦查', '马拉维', 'MW', 'MK'],
+    ['MZN', '莫桑比克梅蒂卡尔', '莫桑比克', 'MZ', 'MT'],
+    ['NAD', '纳米比亚元', '纳米比亚', 'NA', '$'],
+    ['NGN', '尼日利亚奈拉', '尼日利亚', 'NG', '₦'],
+    ['NIO', '尼加拉瓜科多巴', '尼加拉瓜', 'NI', 'C$'],
+    ['NPR', '尼泊尔卢比', '尼泊尔', 'NP', '₨'],
+    ['OMR', '阿曼里亚尔', '阿曼', 'OM', 'ر.ع.'],
+    ['PAB', '巴拿马巴波亚', '巴拿马', 'PA', 'B/.'],
+    ['PEN', '秘鲁索尔', '秘鲁', 'PE', 'S/'],
+    ['PGK', '巴布亚新几内亚基那', '巴布亚新几内亚', 'PG', 'K'],
+    ['PKR', '巴基斯坦卢比', '巴基斯坦', 'PK', '₨'],
+    ['PYG', '巴拉圭瓜拉尼', '巴拉圭', 'PY', '₲'],
+    ['QAR', '卡塔尔里亚尔', '卡塔尔', 'QA', 'ر.ق'],
+    ['RSD', '塞尔维亚第纳尔', '塞尔维亚', 'RS', 'дин'],
+    ['RUB', '俄罗斯卢布', '俄罗斯', 'RU', '₽'],
+    ['RWF', '卢旺达法郎', '卢旺达', 'RW', 'FRw'],
+    ['SAR', '沙特里亚尔', '沙特阿拉伯', 'SA', 'ر.س.'],
+    ['SBD', '所罗门群岛元', '所罗门群岛', 'SB', '$'],
+    ['SCR', '塞舌尔卢比', '塞舌尔', 'SC', '₨'],
+    ['SDG', '苏丹镑', '苏丹', 'SD', 'ج.س.'],
+    ['SHP', '圣赫勒拿镑', '圣赫勒拿', 'SH', '£'],
+    ['SLE', '塞拉利昂利昂', '塞拉利昂', 'SL', 'Le'],
+    ['SOS', '索马里先令', '索马里', 'SO', 'Sh'],
+    ['SRD', '苏里南元', '苏里南', 'SR', '$'],
+    ['SSP', '南苏丹镑', '南苏丹', 'SS', '£'],
+    ['STN', '圣多美多布拉', '圣多美和普林西比', 'ST', 'Db'],
+    ['SVC', '萨尔瓦多科朗', '萨尔瓦多', 'SV', '₡'],
+    ['SYP', '叙利亚镑', '叙利亚', 'SY', '£'],
+    ['SZL', '斯威士兰里兰吉尼', '斯威士兰', 'SZ', 'L'],
+    ['TJS', '塔吉克斯坦索莫尼', '塔吉克斯坦', 'TJ', 'SM'],
+    ['TMT', '土库曼斯坦马纳特', '土库曼斯坦', 'TM', 'm'],
+    ['TND', '突尼斯第纳尔', '突尼斯', 'TN', 'د.ت'],
+    ['TOP', '汤加潘加', '汤加', 'TO', 'T$'],
+    ['TTD', '特立尼达和多巴哥元', '特立尼达和多巴哥', 'TT', '$'],
+    ['TWD', '新台币', '中国台湾', 'TW', 'NT$'],
+    ['TZS', '坦桑尼亚先令', '坦桑尼亚', 'TZ', 'TSh'],
+    ['UAH', '乌克兰格里夫纳', '乌克兰', 'UA', '₴'],
+    ['UGX', '乌干达先令', '乌干达', 'UG', 'USh'],
+    ['UYU', '乌拉圭比索', '乌拉圭', 'UY', '$'],
+    ['UZS', '乌兹别克斯坦苏姆', '乌兹别克斯坦', 'UZ', 'soʻm'],
+    ['VES', '委内瑞拉玻利瓦尔', '委内瑞拉', 'VE', 'Bs'],
+    ['VND', '越南盾', '越南', 'VN', '₫'],
+    ['VUV', '瓦努阿图瓦图', '瓦努阿图', 'VU', 'VT'],
+    ['WST', '萨摩亚塔拉', '萨摩亚', 'WS', 'T'],
+    ['XAF', '中非法郎', '中非', 'CF', 'FCFA'],
+    ['XCD', '东加勒比元', '东加勒比', 'AG', '$'],
+    ['XOF', '西非法郎', '西非', 'SN', 'CFA'],
+    ['XPF', '太平洋法郎', '法属波利尼西亚', 'PF', '₣'],
+    ['YER', '也门里亚尔', '也门', 'YE', '﷼'],
+    ['ZMW', '赞比亚克瓦查', '赞比亚', 'ZM', 'ZK'],
+    // 加密货币与贵金属：仅 fawaz 开源源提供，非央行汇率；选择页单独标注。
+    ['BTC', '比特币', '加密货币', 'BTC', '₿'], ['ETH', '以太坊', '加密货币', 'ETH', 'Ξ'], ['USDT', '泰达币', '加密货币', 'USDT', '₮'], ['USDC', 'USD Coin', '加密货币', 'USDC', '$'], ['BNB', '币安币', '加密货币', 'BNB', 'BNB'], ['SOL', '索拉纳', '加密货币', 'SOL', '◎'], ['XRP', '瑞波币', '加密货币', 'XRP', 'XRP'], ['DOGE', '狗狗币', '加密货币', 'DOGE', 'Ð'],
+    ['XAU', '黄金 盎司', '贵金属', 'XAU', 'Au'], ['XAG', '白银 盎司', '贵金属', 'XAG', 'Ag'], ['XPT', '铂金 盎司', '贵金属', 'XPT', 'Pt'], ['XPD', '钯金 盎司', '贵金属', 'XPD', 'Pd'],
 ].map(([code, name, region, country, symbol]) => ({ code, name, region, country, symbol }));
-function flag(country) { return [...country].map(x => String.fromCodePoint(127397 + x.charCodeAt(0))).join(''); }
+exports.NON_FIAT = { BTC: '₿', ETH: 'Ξ', USDT: '₮', USDC: '$', BNB: '◆', SOL: '◎', XRP: '✕', DOGE: 'Ð', XAU: '🥇', XAG: '🥈', XPT: '⬜', XPD: '⬜' };
+function flag(country) { if (exports.NON_FIAT[country])
+    return exports.NON_FIAT[country]; return [...country].map(x => String.fromCodePoint(127397 + x.charCodeAt(0))).join(''); }
 function search(query, available) { const q = query.trim().toLowerCase(); return exports.CURRENCIES.filter(c => available.includes(c.code) && `${c.code} ${c.name} ${c.region}`.toLowerCase().includes(q)); }
 function validDate(s) { if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s))
     return false; const d = new Date(s + 'T00:00:00Z'); return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === s; }
@@ -175,7 +302,7 @@ async function cached(store, key, load, validate) {
         }
     }
 }
-exports.VERSION = '1.3.14';
+exports.VERSION = '1.4.0';
 function parseYahoo(data) {
     const r = data?.chart?.result?.[0];
     const ts = r?.timestamp, close = r?.indicators?.quote?.[0]?.close;
@@ -219,6 +346,14 @@ function validateIntraday(value, base, quote) {
 exports.SOURCES = [
     { key: 'ecb', name: 'Frankfurter · 欧洲央行 ECB', description: '欧洲央行参考汇率，工作日更新', url: 'https://api.frankfurter.dev/v2/rates?providers=ECB&base=EUR', cache: 'rates.ecb.v2' },
     { key: 'boc', name: 'Frankfurter · 加拿大央行 BOC', description: '加拿大央行指示汇率，工作日更新；交叉换算', url: 'https://api.frankfurter.dev/v2/rates?providers=BOC&base=EUR', cache: 'rates.boc.v1' },
+    { key: 'bdi', name: 'Frankfurter · 意大利银行 BDI', description: '意大利银行每日汇率，币种最多；工作日更新；交叉换算', url: 'https://api.frankfurter.dev/v2/rates?providers=BDI&base=EUR', cache: 'rates.bdi.v1' },
+    { key: 'nbp', name: 'Frankfurter · 波兰国家银行 NBP', description: '波兰国家银行平均汇率，币种较多；工作日更新；交叉换算', url: 'https://api.frankfurter.dev/v2/rates?providers=NBP&base=EUR', cache: 'rates.nbp.v1' },
+    { key: 'cbkkw', name: 'Frankfurter · 科威特央行 CBKKW', description: '科威特央行参考汇率，含海湾币种；工作日更新；交叉换算', url: 'https://api.frankfurter.dev/v2/rates?providers=CBKKW&base=EUR', cache: 'rates.cbkkw.v1' },
+    { key: 'lb', name: 'Frankfurter · 立陶宛银行 LB', description: '立陶宛银行每日汇率，欧洲央行体系成员；工作日更新；交叉换算', url: 'https://api.frankfurter.dev/v2/rates?providers=LB&base=EUR', cache: 'rates.lb.v1' },
+    { key: 'nbu', name: 'Frankfurter · 乌克兰国家银行 NBU', description: '乌克兰国家银行官方汇率；工作日更新；交叉换算', url: 'https://api.frankfurter.dev/v2/rates?providers=NBU&base=EUR', cache: 'rates.nbu.v1' },
+    { key: 'boe', name: 'Frankfurter · 英格兰银行 BOE', description: '英格兰银行现货汇率；工作日更新；交叉换算', url: 'https://api.frankfurter.dev/v2/rates?providers=BOE&base=EUR', cache: 'rates.boe.v1' },
+    { key: 'amcm', name: 'Frankfurter · 澳门金融管理局 AMCM', description: '澳门金管局银行间中间价，含澳门币；工作日更新；交叉换算', url: 'https://api.frankfurter.dev/v2/rates?providers=AMCM&base=EUR', cache: 'rates.amcm.v1' },
+    { key: 'mas', name: 'Frankfurter · 新加坡金融管理局 MAS', description: '新加坡金管局汇率，含亚洲币种；工作日更新；交叉换算', url: 'https://api.frankfurter.dev/v2/rates?providers=MAS&base=EUR', cache: 'rates.mas.v1' },
     { key: 'er', name: 'ExchangeRate-API', description: '开放参考汇率，每日更新', url: 'https://open.er-api.com/v6/latest/EUR', cache: 'rates.er.v1' },
     { key: 'fawaz-cdn', name: '开源汇率 · jsDelivr', description: 'fawazahmed0 每日数据，CDN 日期可能滞后', url: 'https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/eur.json', cache: 'rates.fawaz-cdn.v1' },
     { key: 'fawaz-pages', name: '开源汇率 · Cloudflare', description: 'fawazahmed0 每日数据', url: 'https://latest.currency-api.pages.dev/v1/currencies/eur.json', cache: 'rates.fawaz-pages.v1' },
@@ -234,6 +369,7 @@ function normalizeSettings(value) {
         return { symbols: true, showSource: true, source: 'ecb', defaultAmount: 100, decimals: 2 };
     return { symbols: v.symbols, showSource: v.showSource, source: v.source, defaultAmount: v.defaultAmount, decimals: v.decimals };
 }
+const FRANKFURTER_KEYS = ['ecb', 'boc', 'bdi', 'nbp', 'cbkkw', 'lb', 'nbu', 'boe', 'amcm', 'mas'];
 function parseSource(key, data) {
     if (!exports.SOURCES.some(s => s.key === key))
         throw new Error('未知汇率源');
@@ -246,10 +382,12 @@ function parseSource(key, data) {
     if (key === 'inforeuro')
         return parseInforEuro(data);
     const d = data;
-    if (key === 'ecb' || key === 'boc') {
+    if (FRANKFURTER_KEYS.includes(key)) {
         if (!Array.isArray(d))
             throw new Error('汇率数据格式异常');
-        return parseLatest(d.filter((r) => exports.CURRENCIES.some(c => c.code === r?.quote)));
+        // 同一响应可能混有较旧日期行；只取最新日期，缺失币种不回填旧日期。
+        const dates = d.map((r) => r?.date).filter(validDate).sort(), latest = dates[dates.length - 1];
+        return parseLatest(d.filter((r) => r?.date === latest && exports.CURRENCIES.some(c => c.code === r?.quote && !exports.NON_FIAT[c.code])));
     }
     let date = '', raw = {};
     if (key === 'er') {
@@ -284,6 +422,8 @@ function parseSource(key, data) {
         throw new Error('汇率数据格式异常');
     const rates = {};
     for (const c of exports.CURRENCIES) {
+        if (exports.NON_FIAT[c.code] && !key.startsWith('fawaz-'))
+            continue;
         const v = raw[c.code] ?? raw[c.code.toLowerCase()];
         if (v !== undefined) {
             if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0)
