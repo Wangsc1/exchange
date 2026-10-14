@@ -282,7 +282,7 @@ async function updateSettings(field,value){
  if(settingsSaving)return;settingsSaving=true;
  const buttons=[...document.querySelectorAll('#settingRows button, #choiceRows button, #decimalChoiceRows button')];buttons.forEach(b=>b.disabled=true);
  const origin=page,next={...settings,[field]:value};
- try{await bridge('saveSettings',next);settings=Core.normalizeSettings(next);renderSettings();render();if(field==='source'){snapshot=null;fetchedAt=null;needsRefresh=true;if(page===origin&&origin==='choices')show('menu','back');else{needsRefresh=false;await refresh();if(page==='detail'&&snapshot)renderDetail();}}else if(page===origin&&page==='decimalChoices'){show('decimalSettings','back');}else if(page===origin&&page==='choices')show('menu','back');}
+ try{await bridge('saveSettings',next);settings=Core.normalizeSettings(next);if(field==='defaultAmount')restoreDefaultAmount();renderSettings();render();if(field==='source'){snapshot=null;fetchedAt=null;needsRefresh=true;if(page===origin&&origin==='choices')show('menu','back');else{needsRefresh=false;await refresh();if(page==='detail'&&snapshot)renderDetail();}}else if(page===origin&&page==='decimalChoices'){show('decimalSettings','back');}else if(page===origin&&page==='choices')show('menu','back');}
  catch(e){toast(e.message);}
  finally{settingsSaving=false;buttons.forEach(b=>b.disabled=false);}
 }
