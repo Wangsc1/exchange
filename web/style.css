@@ -28,3 +28,6 @@ body{overflow-x:hidden}
 #home #rows.edited .amount{color:var(--fg)}
 
 .enterRight{animation:pageInRight .38s cubic-bezier(.34,1.35,.64,1)}.enterLeft{animation:pageInLeft .38s cubic-bezier(.34,1.35,.64,1)}@keyframes pageInRight{from{transform:translateX(100%)}to{transform:none}}@keyframes pageInLeft{from{transform:translateX(-100%)}to{transform:none}}@media(prefers-reduced-motion:reduce){.enterRight,.enterLeft{animation:none}}
+
+/* 主页设置图标的可见线条右边缘与金额右边缘对齐（按钮留白与图标内边距共14px）。 */
+#home #settings{margin-right:-14px}
