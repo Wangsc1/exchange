@@ -1,12 +1,12 @@
 # 汇率
 
-面向 **iPhone Scripting App**（不是 Scriptable）的法币参考汇率工具。当前 **1.4.0**。仅供参考，不是实时成交价、银行或银行卡结算报价，不提供数字货币。
+面向 **iPhone Scripting App**（不是 Scriptable）的法币参考汇率工具。当前 **1.4.1**。仅供参考，不是实时成交价、银行或银行卡结算报价。支持约160种法币，另含少量加密货币与贵金属（仅开源源提供，非央行汇率）。
 
 ## 页面与返回方式
 
-当前使用 **单WebViewController** 展示本地页面，网页内保留输入、选择和设置状态。子页没有自绘返回按钮；返回暂用网页左边缘右滑（左侧28px起始，水平超过70px且大于竖向位移）。**这不是系统原生导航，也没有系统交互返回的跟手取消效果。** 列表行左右滑超过一半自动进入对应页面，不过半立即回到原位、不半开停留；设置及其子页不加回弹。
+当前使用 **单WebViewController** 展示本地页面，网页内保留输入、选择和设置状态。子页没有返回按钮；返回使用网页左边缘右滑（左侧28px起始，水平超过70px且大于竖向位移）。**这不是系统原生导航，也没有系统交互返回的跟手取消效果。** 列表行左右滑超过一半自动进入对应页面，不过半立即回到原位、不半开停留。主页、详情页、选择页之间切换带回弹动画，从设置返回主页也带回弹；设置内的子页之间不加回弹。左滑「切换货币」与右滑「汇率详情」的底色在日间、夜间模式一致。
 
-恢复原生返回仍有待确认的宿主能力：官方[NavigationStack path文档](https://scriptingapp.github.io/guide/Views/Navigation/NavigationStack/NavigationStack%20with%20path.md)说明系统返回会同步path，但[导航修饰文档](https://scriptingapp.github.io/guide/View%20Modifiers/Navigation%20View%20Modifiers.md)只说明`navigationBarBackButtonHidden`隐藏按钮，没有保证隐藏后交互右滑仍启用，也未公开专门启用该手势的接口。不能将网页touch或CSS动画称为原生返回。
+**为什么不用系统原生返回：** 真机（Scripting TestFlight 3.3.0、iOS 27.0.1）测试表明，使用 `navigationBarBackButtonHidden` 隐藏系统返回按钮后，第二页显示空白且右滑无法返回；显示返回按钮时则正常。官方文档没有提供在隐藏按钮的同时保留系统右滑的接口。因此保留隐藏返回按钮的方案，使用上述网页右滑。
 
 ### 启动诊断与手机验证
 
@@ -31,9 +31,9 @@
 - **货币默认值**：1/10/100/1,000/10,000，默认100；影响后续基准点击、详情基准金额、恢复列表及AC/删空，不擅自改动正在输入的金额。
 - **小数点位数**：设置→「小数点设置」→「法定货币」。新选项仅无（0）/2/4/6/8位，行高64px、标签17px、灰色示例14px（`1,234`、`1,234.00`等）、右侧对勾，无卡片边框。保存后返回小数点设置，当前值即时同步。旧合法0–8位（含奇数）保留至主动新选，默认仍2位，不静默重置。主页/详情金额及最高最低平均按该位数显示，涨跌百分比仍4位。
 - **恢复默认币种列表**需confirm二次确认，恢复默认六币、基准CNY和当前默认金额，不重置其余设置或缓存。
-- 设置底部「汇率 版本 1.4.0」来自core.ts VERSION。
+- 设置底部「汇率 版本 1.4.1」来自core.ts VERSION。
 
-没有当地货币开关：Intl/navigator.language不能可靠读取系统货币，故不猜测、不修改配置。没有更多设置或数字货币设置，不扩大行情范围。
+没有当地货币开关：Intl/navigator.language不能可靠读取系统货币，故不猜测、不修改配置。没有更多设置，不扩大行情范围；加密货币与贵金属只在所选来源提供时出现。
 
 ## 数据源与条款
 
@@ -42,7 +42,7 @@
 | key | 来源/公开接口 | 频率、访问与使用边界 |
 |---|---|---|
 | ecb（默认） | Frankfurter ECB：`https://api.frankfurter.dev/v2/rates?providers=ECB&base=EUR` | 欧洲央行参考汇率，工作日更新；[ECB使用说明](https://www.ecb.europa.eu/services/using-our-site/disclaimer/html/index.en.html)要求准确引用和署名。 |
-| boc | Frankfurter BOC：同一 `/rates?providers=BOC&base=EUR` | 加拿大央行指示汇率，工作日更新，覆盖工具法币23种，日期可能较ECB落后。[条款](https://www.bankofcanada.ca/terms/)允许免费使用/复制/分发，要求署名、说明修改；本工具标明交叉换算，不用央行logo、不宣称背书。 |
+| boc | Frankfurter BOC：同一 `/rates?providers=BOC&base=EUR` | 加拿大央行指示汇率，工作日更新，目录内约25种，日期可能较ECB落后。[条款](https://www.bankofcanada.ca/terms/)允许免费使用/复制/分发，要求署名、说明修改；本工具标明交叉换算，不用央行logo、不宣称背书。 |
 | bdi | Frankfurter BDI：`/rates?providers=BDI&base=EUR` | 意大利银行每日汇率，约150种法币，工作日更新；只取最新日期。 |
 | nbp | Frankfurter NBP：`/rates?providers=NBP&base=EUR` | 波兰国家银行平均汇率；响应混有旧日期行，只取最新日期，目录内约32种。 |
 | cbkkw | Frankfurter CBKKW：`/rates?providers=CBKKW&base=EUR` | 科威特央行参考汇率，约130种，含海湾币种。 |
@@ -66,19 +66,34 @@ SAFE/H.10/InforEuro/CBR直接连接官方；ECB、BOC及BDI、NBP、CBKKW、LB�
 
 - SAFE官方备注：USD/EUR/JPY/HKD/GBP/AUD/NZD/SGD/CHF/CAD为 **100外币兑多少CNY**，先取 `100/报价` 得每CNY外币；其余15币（包括KRW/MYR/HUF等）为 **100CNY兑多少外币**，先取 `报价/100`。以同日EUR腿统一到每EUR，不漏除100，不把日元误当每1日元报价。
 - FED H.10除星号外为外币/USD；EUR/AUD/GBP/NZD等星号为USD/外币，先取倒数。归一至每EUR，USD腿为1。选择周报最近一个默认六币齐备的同日列；ND不跨日期填充，非默认币ND从可选交集排除。主页是观测日，不是周报发布日。
-- CBR `Value` 为 `Nominal` 个外币兑多少RUB，先取 `Nominal/Value` 得每RUB外币，再以同日EUR腿归一。日元100、韩元1000、印尼盾10000等单位按实际字段处理；卢布只作计算中间腿，未擅自加入30币目录。
+- CBR `Value` 为 `Nominal` 个外币兑多少RUB，先取 `Nominal/Value` 得每RUB外币，再以同日EUR腿归一。日元100、韩元1000、印尼盾10000等单位按实际字段处理；卢布已在币种目录中，选择CBR时可作为目标币种。
 - InforEuro响应没有逐日报价日期，服务把官方请求的year/month作为适用期交给解析器；每EUR报价直接保留，EUR必须为1。月份切换时不把上月20秒缓存当作本月在线结果，取数失败可显式离线返回上月真实缓存，仍显示上月适用日。
 
 ### 覆盖与现有选择缺币
 
-默认六币USD/CNY/CAD/EUR/GBP/AUD必须齐备；缺失或坏数据只退本源真实缓存，不偷用ECB补币。各源覆盖不同，可选列表以本次有效快照为准，30币目录不扩充。
+默认六币USD/CNY/CAD/EUR/GBP/AUD必须齐备；缺失或坏数据只退本源真实缓存，不偷用ECB补币。各源覆盖不同，可选列表以本次有效快照为准，来源没有的币种不显示。
 
-| 来源 | 目录内参考覆盖数 | 常见缺失目录币 |
-|---|---:|---|
-| SAFE | 22 | BRL/CZK/IDR/ILS/INR/ISK/PHP/RON |
-| H.10 | 21 | CZK/HUF/IDR/ILS/ISK/PHP/PLN/RON/TRY |
-| InforEuro | 30 | 无 |
-| CBR | 25 | ILS/ISK/MXN/MYR/PHP |
+| 来源 | 目录内参考覆盖数（2026-10-13/14实测） |
+|---|---:|
+| ECB | 30 |
+| BOC | 25 |
+| 意大利银行 BDI | 148 |
+| 科威特央行 CBKKW | 131 |
+| ExchangeRate-API | 149 |
+| FloatRates | 145 |
+| 开源汇率（jsDelivr / Cloudflare） | 163（含加密货币与贵金属） |
+| 乌克兰国家银行 NBU | 41 |
+| 波兰国家银行 NBP | 32 |
+| 立陶宛银行 LB | 30 |
+| 英格兰银行 BOE | 27 |
+| 新加坡金管局 MAS | 22 |
+| 澳门金管局 AMCM | 18 |
+| SAFE 人民币中间价 | 22 |
+| 美联储 H.10 | 21 |
+| 欧盟 InforEuro（月度） | 149 |
+| 俄罗斯央行 CBR | 25 |
+
+覆盖数随上游每日变化，仅供参考。想要币种最全，可选 BDI、科威特央行、ExchangeRate-API 或开源汇率。
 
 切换源不自动改六行、基准或输入金额：已有缺失非基准行显示破折号，缺失基准保留用户输入但其他换算显示破折号，并提示不覆盖币种。不能点击无报价行设基准或打开换算详情。可替换缺失非基准行；缺失基准无法进行等值折算，明确提示先点击有汇率的行设基准（沿用既有默认金额点击语义），再替换缺失行，或换回覆盖源。不静默改币/改金额，不混源。
 
@@ -96,7 +111,7 @@ Frankfurter免费API仍遵守各提供方条款。不保证SLA和交易准确性
 
 官方私有Storage：`config.v1`保存六币/基准/金额，`settings.v1`保存开关/源/默认金额/小数位。逐字段校验，损坏恢复默认，不因字段顺序误报。
 
-最新缓存独立键：`rates.ecb.v2`、`rates.boc.v1`、`rates.er.v1`、`rates.fawaz-cdn.v1`、`rates.fawaz-pages.v1`、`rates.float.v1`、`rates.safe.v1`、`rates.fed.v1`、`rates.inforeuro.v1`、`rates.cbr.v1`。成功取得时间为各键加 `.fetchedAt`；er额外 `.attemptAt`限制失败重试。er一小时内复用，其余20秒内复用；网络/HTTP/解析失败只回退本源，标明离线、日期和原因。无缓存不合成行情，历史/日内按货币对/周期最多60份。
+最新缓存独立键：`rates.ecb.v2`、`rates.boc.v1`、`rates.bdi.v1`、`rates.nbp.v1`、`rates.cbkkw.v1`、`rates.lb.v1`、`rates.nbu.v1`、`rates.boe.v1`、`rates.amcm.v1`、`rates.mas.v1`、`rates.er.v1`、`rates.fawaz-cdn.v1`、`rates.fawaz-pages.v1`、`rates.float.v1`、`rates.safe.v1`、`rates.fed.v1`、`rates.inforeuro.v1`、`rates.cbr.v1`。成功取得时间为各键加 `.fetchedAt`；er额外 `.attemptAt`限制失败重试。er一小时内复用，其余20秒内复用；网络/HTTP/解析失败只回退本源，标明离线、日期和原因。无缓存不合成行情，历史/日内按货币对/周期最多60份。
 
 设置顶部「上次更新 今天/昨天/日期HH:mm」是本源最近成功取得的本地时间，离线不改为当前时间；旧缓存无时间显示暂无记录。网络20秒超时；Storage异步刷盘，不承诺强制终止瞬间持久化。用户金额与配置不上传网络。
 
@@ -104,7 +119,7 @@ Frankfurter免费API仍遵守各提供方条款。不保证SLA和交易准确性
 
 使用当前Scripting App。[一键导入](https://scripting.fun/import_scripts?urls=["https%3A%2F%2Fgithub.com%2FWangsc1%2Fexchange"])；更新用 **Scripting自带长按更新或一键导入**，保留 `script.json.remoteResource.url`，无应用内更新、无update.ts。
 
-本地导入需 `script.json`、`index.tsx`、`core.ts`、`service.ts`及完整 `web/`。core/script/version三处同步1.4.0，version.json保留中文摘要和文件清单。
+本地导入需 `script.json`、`index.tsx`、`core.ts`、`service.ts`及完整 `web/`。core/script/version三处同步1.4.1，version.json保留中文摘要和文件清单。
 
 ## 开发与验证
 
@@ -122,8 +137,8 @@ check严格检查纯业务、入口语法、共享构建一致性及版本；宿
 
 ## 币种目录
 
-core.CURRENCIES 原为30种法币，现扩充为约160种法币加8种加密货币、4种贵金属；原30种为：USD、CNY、CAD、EUR、GBP、AUD、BRL、CHF、CZK、DKK、HKD、HUF、IDR、ILS、INR、ISK、JPY、KRW、MXN、MYR、NOK、NZD、PHP、PLN、RON、SEK、SGD、THB、TRY、ZAR。
+core.CURRENCIES 收录约160种法币，加8种加密货币（BTC、ETH、USDT、USDC、BNB、SOL、XRP、DOGE）和4种贵金属（黄金、白银、铂金、钯金）。最初的30种常用法币为：USD、CNY、CAD、EUR、GBP、AUD、BRL、CHF、CZK、DKK、HKD、HUF、IDR、ILS、INR、ISK、JPY、KRW、MXN、MYR、NOK、NZD、PHP、PLN、RON、SEK、SGD、THB、TRY、ZAR。
 
-所有源只保留该目录，选择页再取实际快照交集。上游包含更多币种不意味着本工具全部展示。常用与字母分组可能重复展示同一币，应按唯一代码计数。
+所有源只保留该目录，选择页再取实际快照交集。加密货币与贵金属在选择页标注「非央行行情」，仅开源汇率源提供；24时/7天走势使用Yahoo外汇行情，这些币种可能没有走势数据。常用与字母分组可能重复展示同一币，应按唯一代码计数。
 
 主要文件：index.tsx（单WebView入口/诊断）、core.ts（算法/设置/解析）、service.ts（网络/Storage）、web/（本地UI/生成业务脚本）、scripts/（构建/检查/真实接口核验）、tests/（测试夹具，仅用于测试）、FONT-LICENSE-Barlow-OFL.txt（字体许可）。
