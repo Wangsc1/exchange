@@ -68,7 +68,7 @@ function renderRows() {
   $('rows').replaceChildren();
   config.codes.forEach((code, index) => {
     const c = currency(code), row = element('div', undefined, 'row' + (code === config.base ? ' active' : ''));
-    const swap = element('button', '切换货币 ⇆', 'swipe left'), info = element('button', 'ⓘ 汇率详情', 'swipe right');
+    const swap = element('button', '切换货币 ⇆', 'swipe left'), info = element('button', '汇率详情', 'swipe right');
     swap.setAttribute('aria-label', '切换' + c.name); info.setAttribute('aria-label', c.name + '汇率详情');
     swap.onclick = () => openSelector({ kind: 'row', index, back: 'home' }); info.onclick = () => openDetail(code);
     const content = element('button', undefined, 'rowContent');
