@@ -28,3 +28,6 @@ body{overflow-x:hidden}
 #home #rows.edited .amount{color:var(--fg)}
 
 .enterRight{animation:pageInRight .38s cubic-bezier(.34,1.35,.64,1)}.enterLeft{animation:pageInLeft .38s cubic-bezier(.34,1.35,.64,1)}@keyframes pageInRight{from{transform:translateX(100%)}to{transform:none}}@keyframes pageInLeft{from{transform:translateX(-100%)}to{transform:none}}@media(prefers-reduced-motion:reduce){.enterRight,.enterLeft{animation:none}}
+
+/* 日间模式：左滑「切换货币」底色调浅；深色模式与光标蓝不变。 */
+@media(prefers-color-scheme:light){.swipe.left{background:#a9c2fb}}

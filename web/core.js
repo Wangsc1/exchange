@@ -175,7 +175,7 @@ async function cached(store, key, load, validate) {
         }
     }
 }
-exports.VERSION = '1.3.2';
+exports.VERSION = '1.3.3';
 function parseYahoo(data) {
     const r = data?.chart?.result?.[0];
     const ts = r?.timestamp, close = r?.indicators?.quote?.[0]?.close;
