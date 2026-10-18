@@ -1,6 +1,10 @@
 # 汇率
 
-面向 **iPhone Scripting App**的法币参考汇率工具。当前 **1.4.1**。仅供参考，不是实时成交价、银行或银行卡结算报价。支持约160种法币，另含少量加密货币与贵金属（仅开源源提供，非央行汇率）。
+面向 **iPhone Scripting App**的法币参考汇率工具。当前 **1.4.2**。仅供参考，不是实时成交价、银行或银行卡结算报价。支持约160种法币，另含少量加密货币与贵金属（仅开源源提供，非央行汇率）。
+
+## 一键导入
+
+**[点此一键导入「汇率」到 Scripting](https://scripting.fun/import_scripts?urls=["https%3A%2F%2Fgithub.com%2FWangsc1%2Fexchange"])**（需在 iPhone 上用已安装 Scripting 的设备打开；导入后更新可在 Scripting 中长按脚本选择更新）。
 
 ## 页面与返回方式
 
@@ -31,7 +35,7 @@
 - **货币默认值**：1/10/100/1,000/10,000，默认100；影响后续基准点击、详情基准金额、恢复列表及AC/删空，不擅自改动正在输入的金额。
 - **小数点位数**：设置→「小数点设置」→「法定货币」。新选项仅无（0）/2/4/6/8位，行高64px、标签17px、灰色示例14px（`1,234`、`1,234.00`等）、右侧对勾，无卡片边框。保存后返回小数点设置，当前值即时同步。旧合法0–8位（含奇数）保留至主动新选，默认仍2位，不静默重置。主页/详情金额及最高最低平均按该位数显示，涨跌百分比仍4位。
 - **恢复默认币种列表**需confirm二次确认，恢复默认六币、基准CNY和当前默认金额，不重置其余设置或缓存。
-- 设置底部「汇率 版本 1.4.1」来自core.ts VERSION。
+- 设置底部「汇率 版本 1.4.2」来自core.ts VERSION。
 
 没有当地货币开关：Intl/navigator.language不能可靠读取系统货币，故不猜测、不修改配置。没有更多设置，不扩大行情范围；加密货币与贵金属只在所选来源提供时出现。
 
@@ -119,7 +123,7 @@ Frankfurter免费API仍遵守各提供方条款。不保证SLA和交易准确性
 
 使用当前Scripting App。[一键导入](https://scripting.fun/import_scripts?urls=["https%3A%2F%2Fgithub.com%2FWangsc1%2Fexchange"])；更新用 **Scripting自带长按更新或一键导入**，保留 `script.json.remoteResource.url`，无应用内更新、无update.ts。
 
-本地导入需 `script.json`、`index.tsx`、`core.ts`、`service.ts`及完整 `web/`。core/script/version三处同步1.4.1，version.json保留中文摘要和文件清单。
+本地导入需 `script.json`、`index.tsx`、`core.ts`、`service.ts`及完整 `web/`。core/script/version三处同步1.4.2，version.json保留中文摘要和文件清单。
 
 ## 开发与验证
 

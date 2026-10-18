@@ -1,6 +1,6 @@
 {
-  "version": "1.4.1",
-  "notes": "更新应用简介与README：补充约160种币种、17个官方汇率源、返回方式说明及各源覆盖数。",
+  "version": "1.4.2",
+  "notes": "README 新增一键导入专节；清理未使用的 CSS 规则。",
   "files": [
     "index.tsx",
     "core.ts",
