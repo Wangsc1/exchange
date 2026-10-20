@@ -28,7 +28,7 @@ function mount(){
  for(const id of PAGE_IDS)$(id).classList.toggle('hidden',id!==page);
  render();
  if(page==='detail'&&snapshot)renderDetail();
- if(page==='selector'){$('selectTitle').textContent=selection?.kind==='base'?'选择基准币种':selection?.kind==='quote'?'选择目标币种':'切换货币';renderSelector();}
+ if(page==='selector'){$('selectTitle').textContent=selection?.kind==='base'?'选择基准币种':selection?.kind==='quote'?'选择目标币种':'切换货币';renderSelector();scrollToSelected();}
  if(page==='menu')renderSettings();
  if(page==='choices')renderChoices(choiceField,choiceTitle);
  if(page==='decimalSettings')renderDecimalSettings();
@@ -153,7 +153,7 @@ function input(key) {
 ['7','8','9','+','4','5','6','-','1','2','3','×','.','0','⌫','÷'].forEach(key => { const b = element('button', key); b.setAttribute('aria-label', key === '⌫' ? '退格' : key); b.onclick = () => input(key); $('keyboard').append(b); });
 $('clear').onclick = () => { input('AC'); fresh = true; }; $('equals').onclick = () => input('=');
 function available() { return snapshot ? Object.keys(snapshot.rates) : []; }
-function openSelector(value, dir = 'right') { if (!snapshot) return toast('请先取得可用币种汇率'); selection = value; $('selectTitle').textContent = value.kind === 'row' ? '切换货币' : value.kind === 'base' ? '选择基准币种' : '选择目标币种'; $('search').value = ''; show('selector', dir); if(!NATIVE)renderSelector(); }
+function openSelector(value, dir = 'right') { if (!snapshot) return toast('请先取得可用币种汇率'); selection = value; $('selectTitle').textContent = value.kind === 'row' ? '切换货币' : value.kind === 'base' ? '选择基准币种' : '选择目标币种'; $('search').value = ''; show('selector', dir); if(!NATIVE){renderSelector();scrollToSelected();} }
 function selectedCode() { return selection.kind === 'row' ? config.codes[selection.index] : selection.kind === 'base' ? detailBase : detailQuote; }
 // 中文名称首字拼音首字母（固定表，避免依赖系统拼音排序）。
 const INITIAL = { USD:'M',CNY:'R',CAD:'J',EUR:'O',GBP:'Y',AUD:'A',BRL:'B',CHF:'R',CZK:'J',DKK:'D',HKD:'G',HUF:'X',IDR:'Y',ILS:'Y',INR:'Y',ISK:'B',JPY:'R',KRW:'H',MXN:'M',MYR:'M',NOK:'N',NZD:'X',PHP:'F',PLN:'B',RON:'L',SEK:'R',SGD:'X',THB:'T',TRY:'T',ZAR:'N',BTC:'B',ETH:'Y',USDT:'T',USDC:'U',BNB:'B',SOL:'S',XRP:'R',DOGE:'G',XAU:'H',XAG:'B',XPT:'B',XPD:'B',AED:'A',AFN:'A',ALL:'A',AMD:'Y',AOA:'A',ARS:'A',AWG:'A',AZN:'A',BAM:'B',BBD:'B',BDT:'M',BHD:'B',BIF:'B',BMD:'B',BND:'W',BOB:'B',BSD:'B',BTN:'B',BWP:'B',BZD:'B',CDF:'G',CLP:'Z',COP:'G',CRC:'G',CUP:'G',CVE:'F',DJF:'J',DOP:'D',DZD:'A',EGP:'A',ERN:'E',ETB:'A',FJD:'F',FKP:'F',GEL:'G',GHS:'J',GIP:'Z',GMD:'G',GNF:'J',GTQ:'W',GYD:'G',HNL:'H',HTG:'H',IQD:'Y',IRR:'Y',JMD:'Y',JOD:'Y',KES:'K',KGS:'J',KHR:'J',KMF:'K',KPW:'C',KWD:'K',KYD:'K',KZT:'H',LAK:'L',LBP:'L',LKR:'S',LRD:'L',LSL:'L',LYD:'L',MAD:'M',MDL:'M',MGA:'M',MKD:'B',MMK:'M',MNT:'M',MOP:'A',MRU:'M',MUR:'M',MVR:'M',MWK:'M',MZN:'M',NAD:'N',NGN:'N',NIO:'N',NPR:'N',OMR:'A',PAB:'B',PEN:'B',PGK:'B',PKR:'B',PYG:'B',QAR:'K',RSD:'S',RUB:'E',RWF:'L',SAR:'S',SBD:'S',SCR:'S',SDG:'S',SHP:'S',SLE:'S',SOS:'S',SRD:'S',SSP:'N',STN:'S',SVC:'S',SYP:'X',SZL:'S',TJS:'T',TMT:'T',TND:'T',TOP:'T',TTD:'T',TWD:'X',TZS:'T',UAH:'W',UGX:'W',UYU:'W',UZS:'W',VES:'W',VND:'Y',VUV:'W',WST:'S',XAF:'Z',XCD:'D',XOF:'X',XPF:'T',YER:'Y',ZMW:'Z' };
@@ -176,6 +176,8 @@ function jumpLetter(clientY) {
   const end = () => { down = false; $('letterBubble').classList.add('hidden'); };
   box.onpointerup = end; box.onpointercancel = end;
 }
+// 打开切换货币时滚到当前币种，使其对勾可见；搜索输入时不滚动。
+function scrollToSelected(){requestAnimationFrame(()=>{const list=$('currencyList'),el=list.querySelector('.currency[aria-pressed="true"]');if(!el)return;list.scrollTop=Math.max(0,el.offsetTop-(list.clientHeight-el.offsetHeight)/2);});}
 function renderSelector() {
   const query = $('search').value, found = Core.search(query, available()), common = Core.DEFAULT_CODES;
   $('currencyList').replaceChildren();
