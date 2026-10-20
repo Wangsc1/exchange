@@ -33,3 +33,6 @@ body{overflow-x:hidden}
 #home #settings{margin-right:-14px}
 
 #detail header{height:32px}
+
+/* 原生导航栏提供子页标题和返回箭头，不叠加网页整页动画。主页保留设置入口。 */
+.nativeNavigation .page:not(#home)>header{display:none}.nativeNavigation #home h1{visibility:hidden}.nativeNavigation .page{min-height:100%;padding-top:0}

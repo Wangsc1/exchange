@@ -7,7 +7,7 @@ export const root=fileURLToPath(new URL('../',import.meta.url));
 const require=createRequire(import.meta.url);
 export const ts=require(process.env.TYPESCRIPT_PATH||'typescript');
 export function loadTS(file,imports={},globals={}) {
-  const output=ts.transpileModule(readFileSync(root+file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS},reportDiagnostics:true});
+  const output=ts.transpileModule(readFileSync(root+file,'utf8'),{fileName:file,compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.React},reportDiagnostics:true});
   if(output.diagnostics?.length)throw new Error('TS语法诊断：'+JSON.stringify(output.diagnostics));
   const exports={},context={exports,require:name=>{if(!(name in imports))throw new Error('未模拟的模块 '+name);return imports[name];},console,Date,Error,Promise,...globals};
   vm.runInNewContext(output.outputText,context,{filename:file});return {exports,context};

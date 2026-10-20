@@ -302,7 +302,7 @@ async function cached(store, key, load, validate) {
         }
     }
 }
-exports.VERSION = '1.4.2';
+exports.VERSION = '1.5.0';
 function parseYahoo(data) {
     const r = data?.chart?.result?.[0];
     const ts = r?.timestamp, close = r?.indicators?.quote?.[0]?.close;

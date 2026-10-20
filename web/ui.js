@@ -1,6 +1,8 @@
 /* 本地界面；所有网络与持久化操作通过官方 Promise 消息桥完成。 */
 'use strict';
 const $ = id => document.getElementById(id);
+const BOOT=window.__exchangeBoot||{},NATIVE=BOOT.native===true;
+let ready=false,active=true,navigating=false;
 let settings = Core.normalizeSettings(null), fetchedAt = null, refreshToken = 0, settingsSaving = false;
 let config = Core.normalizeConfig(null), snapshot = null, expr = '100', fresh = true, edited = false;
 let offline = false, warning = '', busy = false, page = 'home', toastTimer, saveQueue = Promise.resolve();
@@ -33,23 +35,28 @@ function mount(){
  if(page==='decimalChoices')renderDecimalChoices();
  if(needsRefresh&&(page==='menu'||page==='home')){needsRefresh=false;refresh();}
 }
-// 1.2.1 临时恢复：单网页页面栈与自定义边缘返回，不是系统原生导航。
+// 所有正式子页由原生navigationDestination push/pop；兼容回退仍可独立运行。
+function sharedState(){return {config,settings,snapshot,expr,fresh,edited,offline,warning,fetchedAt,selection,detailBase,detailQuote,detailAmount,period,choiceField,choiceTitle,needsRefresh:needsRefresh||busy};}
+function applyState(s){if(!s)return;config=Core.normalizeConfig(s.config);settings=Core.normalizeSettings(s.settings);snapshot=s.snapshot?Core.validateSnapshot(s.snapshot):null;expr=s.expr??numberText(config.amount);fresh=s.fresh??true;edited=!!s.edited;offline=!!s.offline;warning=s.warning||'';fetchedAt=s.fetchedAt||null;selection=s.selection||null;detailBase=s.detailBase||'CNY';detailQuote=s.detailQuote||'USD';detailAmount=s.detailAmount??settings.defaultAmount;period=s.period||1;choiceField=s.choiceField||'source';choiceTitle=s.choiceTitle||'换算汇率源';needsRefresh=!!s.needsRefresh;}
+function publish(){if(NATIVE&&ready&&active){try{Promise.resolve(window.webkit.messageHandlers.exchange.postMessage({id:0,action:'state',value:sharedState()})).catch(()=>{});}catch{}}}
+window.__exchangePause=()=>{active=false;refreshToken++;historyToken++;if(busy){busy=false;needsRefresh=true;}};
+window.__exchangeResume=s=>{refreshToken++;historyToken++;busy=false;active=true;navigating=false;applyState(s);mount();if(page==='detail'&&(!snapshot||needsRefresh)){needsRefresh=false;refresh().then(()=>{if(snapshot&&active&&page==='detail')renderDetail();});}};
 const pageStack=[],entryDir={};
 function show(target,dir='right'){
- const leaving=page;
+ if(NATIVE){
+  if(navigating)return;navigating=true;historyToken++;
+  saveQueue.catch(()=>{}).then(()=>bridge('navigate',{page:target,back:dir==='back',state:sharedState()})).catch(e=>{navigating=false;toast(e.message);});
+  return;
+ }
  historyToken++;
- if(dir==='back'){target=pageStack.pop()||target||'home';dir=entryDir[leaving]==='right'?'left':'right';}
- else{pageStack.push(leaving);entryDir[target]=dir;}
+ const leaving=page;
+ if(dir==='back'){target=pageStack.pop()||target||'home';dir=entryDir[leaving]==='right'?'left':'right';}else{pageStack.push(page);entryDir[target]=dir;}
  page=target;mount();
  for(const id of PAGE_IDS)$(id).classList.remove('enterLeft','enterRight');
- // 设置相关页面不叠加回弹，只在三个主页面之间保留原进入动画。
- // 例外：从设置返回主页也使用回弹动画。
- if((['home','detail','selector'].includes(leaving)&&['home','detail','selector'].includes(target))||(leaving==='menu'&&target==='home')){
-  void $(target).offsetWidth;$(target).classList.add(dir==='left'?'enterLeft':'enterRight');
- }
+ if(target==='home'||(['home','detail','selector'].includes(leaving)&&['home','detail','selector'].includes(target))){void $(target).offsetWidth;$(target).classList.add(dir==='left'?'enterLeft':'enterRight');}
 }
-function backPage(){if(pageStack.length)show(pageStack[pageStack.length-1],'back');}
-{
+function backPage(){if(NATIVE)return;if(pageStack.length)show(pageStack[pageStack.length-1],'back');}
+if(!NATIVE){
  let sx=0,sy=0,tracking=false;
  document.addEventListener('touchstart',e=>{const t=e.touches[0];tracking=page!=='home'&&e.touches.length===1&&t.clientX<=28;sx=t.clientX;sy=t.clientY;},{passive:true});
  document.addEventListener('touchend',e=>{if(!tracking)return;tracking=false;const t=e.changedTouches[0],dx=t.clientX-sx,dy=Math.abs(t.clientY-sy);if(dx>70&&dx>dy*1.5)backPage();},{passive:true});
@@ -117,12 +124,13 @@ function renderRows() {
   });
 }
 function render() {
-  renderRows(); $('expression').textContent = `${expr} ${config.base}`;
+  renderRows(); publish(); $('expression').textContent = `${expr} ${config.base}`;
   const src = Core.SOURCES.find(s => s.key === settings.source);
   $('source').classList.toggle('hidden', !settings.showSource);
   $('source').textContent = `${src.name} | ${snapshot ? snapshot.date : '暂无数据'}${offline ? ' | 离线缓存' : ''}${warning ? ' | ' + warning : ''}`;
 }
 async function refresh() {
+  if(!active)return;
   const token = ++refreshToken, key = settings.source; busy = true;
   snapshot = null; warning = ''; render();
   try { const r = await bridge('latest', key); if(token !== refreshToken)return; snapshot = Core.validateSnapshot(r.value); offline = r.offline; warning = r.warning; fetchedAt = r.fetchedAt || null; const missing=config.codes.filter(c=>!snapshot.rates[c]);if(missing.length){const note='本源不覆盖已选 '+missing.join('/')+'，保留配置不自动折算，请切换缺失行或换源';warning=[warning,note].filter(Boolean).join('；');} if (warning) toast(warning); }
@@ -145,7 +153,7 @@ function input(key) {
 ['7','8','9','+','4','5','6','-','1','2','3','×','.','0','⌫','÷'].forEach(key => { const b = element('button', key); b.setAttribute('aria-label', key === '⌫' ? '退格' : key); b.onclick = () => input(key); $('keyboard').append(b); });
 $('clear').onclick = () => { input('AC'); fresh = true; }; $('equals').onclick = () => input('=');
 function available() { return snapshot ? Object.keys(snapshot.rates) : []; }
-function openSelector(value, dir = 'right') { if (!snapshot) return toast('请先取得可用币种汇率'); selection = value; $('selectTitle').textContent = value.kind === 'row' ? '切换货币' : value.kind === 'base' ? '选择基准币种' : '选择目标币种'; $('search').value = ''; show('selector', dir); renderSelector(); }
+function openSelector(value, dir = 'right') { if (!snapshot) return toast('请先取得可用币种汇率'); selection = value; $('selectTitle').textContent = value.kind === 'row' ? '切换货币' : value.kind === 'base' ? '选择基准币种' : '选择目标币种'; $('search').value = ''; show('selector', dir); if(!NATIVE)renderSelector(); }
 function selectedCode() { return selection.kind === 'row' ? config.codes[selection.index] : selection.kind === 'base' ? detailBase : detailQuote; }
 // 中文名称首字拼音首字母（固定表，避免依赖系统拼音排序）。
 const INITIAL = { USD:'M',CNY:'R',CAD:'J',EUR:'O',GBP:'Y',AUD:'A',BRL:'B',CHF:'R',CZK:'J',DKK:'D',HKD:'G',HUF:'X',IDR:'Y',ILS:'Y',INR:'Y',ISK:'B',JPY:'R',KRW:'H',MXN:'M',MYR:'M',NOK:'N',NZD:'X',PHP:'F',PLN:'B',RON:'L',SEK:'R',SGD:'X',THB:'T',TRY:'T',ZAR:'N',BTC:'B',ETH:'Y',USDT:'T',USDC:'U',BNB:'B',SOL:'S',XRP:'R',DOGE:'G',XAU:'H',XAG:'B',XPT:'B',XPD:'B',AED:'A',AFN:'A',ALL:'A',AMD:'Y',AOA:'A',ARS:'A',AWG:'A',AZN:'A',BAM:'B',BBD:'B',BDT:'M',BHD:'B',BIF:'B',BMD:'B',BND:'W',BOB:'B',BSD:'B',BTN:'B',BWP:'B',BZD:'B',CDF:'G',CLP:'Z',COP:'G',CRC:'G',CUP:'G',CVE:'F',DJF:'J',DOP:'D',DZD:'A',EGP:'A',ERN:'E',ETB:'A',FJD:'F',FKP:'F',GEL:'G',GHS:'J',GIP:'Z',GMD:'G',GNF:'J',GTQ:'W',GYD:'G',HNL:'H',HTG:'H',IQD:'Y',IRR:'Y',JMD:'Y',JOD:'Y',KES:'K',KGS:'J',KHR:'J',KMF:'K',KPW:'C',KWD:'K',KYD:'K',KZT:'H',LAK:'L',LBP:'L',LKR:'S',LRD:'L',LSL:'L',LYD:'L',MAD:'M',MDL:'M',MGA:'M',MKD:'B',MMK:'M',MNT:'M',MOP:'A',MRU:'M',MUR:'M',MVR:'M',MWK:'M',MZN:'M',NAD:'N',NGN:'N',NIO:'N',NPR:'N',OMR:'A',PAB:'B',PEN:'B',PGK:'B',PKR:'B',PYG:'B',QAR:'K',RSD:'S',RUB:'E',RWF:'L',SAR:'S',SBD:'S',SCR:'S',SDG:'S',SHP:'S',SLE:'S',SOS:'S',SRD:'S',SSP:'N',STN:'S',SVC:'S',SYP:'X',SZL:'S',TJS:'T',TMT:'T',TND:'T',TOP:'T',TTD:'T',TWD:'X',TZS:'T',UAH:'W',UGX:'W',UYU:'W',UZS:'W',VES:'W',VND:'Y',VUV:'W',WST:'S',XAF:'Z',XCD:'D',XOF:'X',XPF:'T',YER:'Y',ZMW:'Z' };
@@ -209,6 +217,7 @@ function openDetail(code) {
   try { detailBase = code; detailAmount = settings.defaultAmount; detailQuote = code === 'USD' ? 'CNY' : 'USD'; show('detail', 'right'); } catch (e) { toast(e.message); }
 }
 function renderDetail() {
+  publish();
   const base = currency(detailBase), quote = currency(detailQuote); $('pair').replaceChildren();
   const b = element('button', `${Core.flag(base.country)} ${numberText(detailAmount)} ${detailBase}`), q = element('button', `${Core.flag(quote.country)} ${detailQuote} ▾`);
   b.onclick = () => openSelector({kind:'base',back:'detail'}); q.onclick = () => openSelector({kind:'quote',back:'detail'});
@@ -251,13 +260,16 @@ function chart(records,stats) {
   const title=svg('title',{});title.textContent=`${records[0].base}兑${records[0].quote}，${records[0].date}至${records[records.length-1].date}，最低${stats.low}，最高${stats.high}`;$('chart').prepend(title);
 }
 async function start(){
+ if(NATIVE)document.body.classList.add('nativeNavigation');
+ page=BOOT.page||'home';
+ if(BOOT.state){applyState(BOOT.state);ready=true;mount();if(page==='detail'&&(!snapshot||needsRefresh)){needsRefresh=false;await refresh();if(snapshot)renderDetail();}return;}
  mount();
- try{config=Core.normalizeConfig(await bridge('config'));settings=Core.normalizeSettings(await bridge('settings'));expr=numberText(config.amount);mount();}catch(e){toast(e.message);}
+ try{config=Core.normalizeConfig(await bridge('config'));settings=Core.normalizeSettings(await bridge('settings'));expr=numberText(config.amount);ready=true;mount();}catch(e){ready=true;toast(e.message);}
  await refresh();
 }
 start();
 let lastRefresh=Date.now();
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&page==='home'&&Date.now()-lastRefresh>20000){lastRefresh=Date.now();refresh();}});
+document.addEventListener('visibilitychange',()=>{if(active&&document.visibilityState==='visible'&&page==='home'&&Date.now()-lastRefresh>20000){lastRefresh=Date.now();refresh();}});
 
 function updatedText() {
  if(!fetchedAt)return '上次更新 暂无成功记录';
