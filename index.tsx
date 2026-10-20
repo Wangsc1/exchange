@@ -79,7 +79,15 @@ async function run(){
    if(!record)return <Text>页面已关闭</Text>
    const title=record.title
    return <VStack frame={{maxWidth:'infinity',maxHeight:'infinity'}} navigationTitle={title} navigationBarTitleDisplayMode="inline"
-    toolbar={id==='root'&&!presented?{cancellationAction:<Button title="" systemImage="xmark" action={()=>dismiss?.()}/>} : undefined}
+    ignoresSafeArea={id==='root'?{regions:'container',edges:'bottom'}:undefined}
+    toolbar={id==='root'&&!presented?{
+     cancellationAction:<Button title="" systemImage="xmark" action={()=>dismiss?.()}/>,
+     primaryAction:<Button title="" systemImage="ellipsis.circle" action={()=>{
+      if(!session?.isActive(id))return
+      const view=record.controller as WebViewController
+      loading.get(view)?.then(()=>{if(alive.has(view)&&session?.isActive(id))return view.evaluateJavaScript('window.__exchangeOpenSettings()')}).catch(fail)
+     }}/>
+    } : undefined}
     onAppear={()=>{loaders.get(id)?.().catch(fail)}}
     navigationDestination={{isPresented:presented,onChanged:value=>{if(!value){setPresented(false);const child=session!.pages.get(id)?.child;if(child)session!.pop(child).catch(fail)}},content:<Destination id={record.child}/>}}>
     <WebView controller={record.controller as WebViewController} frame={{maxWidth:'infinity',maxHeight:'infinity'}}/>
@@ -88,7 +96,7 @@ async function run(){
   function App(){dismiss=Navigation.useDismiss();return <NavigationStack><Screen id="root"/></NavigationStack>}
   stage='展示原生导航'
   // 壳先展示，再在onAppear加载网页；30秒内未出现回调也有可诊断失败，不会永远无反应。
-  await Promise.race([Navigation.present({element:<App/>}),failure]);if(nativeError)throw nativeError
+  await Promise.race([Navigation.present({element:<App/>,modalPresentationStyle:'fullScreen'}),failure]);if(nativeError)throw nativeError
  }catch(error){
   nativeRunning=false
   fallbackState=session?.state||null;session?.dispose();session=undefined

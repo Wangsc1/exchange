@@ -9,7 +9,8 @@ async function runEntry(mode='success'){
  const calls=[],dialogs=[],errors=[],views=[];let exit,dismiss,finishLatest,render,currentOwner;const stateMap=new Map(),mounted=new Set(),nodes=new Map();
  const done=new Promise(r=>exit=r);
  const React={createElement:(type,props,...children)=>({type,props:{...props,children}})};
- const host={Script:{directory:root,exit:()=>{calls.push('exit');exit();}},VStack:'stack',WebView:'web',Text:'text',Button:'button',NavigationStack:'navigation',useState:()=>{const key=currentOwner;return [stateMap.get(key)||false,value=>{stateMap.set(key,value);queueMicrotask(()=>render?.());}];},Navigation:{useDismiss:()=>()=>{calls.push('dismiss');dismiss?.();},present:async({element})=>{
+ const host={Script:{directory:root,exit:()=>{calls.push('exit');exit();}},VStack:'stack',WebView:'web',Text:'text',Button:'button',NavigationStack:'navigation',useState:()=>{const key=currentOwner;return [stateMap.get(key)||false,value=>{stateMap.set(key,value);queueMicrotask(()=>render?.());}];},Navigation:{useDismiss:()=>()=>{calls.push('dismiss');dismiss?.();},present:async({element,modalPresentationStyle})=>{
+  assert.equal(modalPresentationStyle,'fullScreen');
   calls.push('native-present');if(mode==='present')throw new Error('原生展示异常');
   const pending=new Promise(r=>dismiss=r);
   function mount(node,owner){if(!node||typeof node!=='object')return;if(typeof node.type==='function'){const next=node.props.id||owner;currentOwner=next;return mount(node.type(node.props),next);}if(node.type==='stack'){nodes.set(owner,node.props);if(!mounted.has(owner)){mounted.add(owner);node.props.onAppear?.();}}for(const c of node.props.children||[])mount(c,owner);if(node.props.navigationDestination?.isPresented)mount(node.props.navigationDestination.content,owner);}
@@ -17,8 +18,10 @@ async function runEntry(mode='success'){
   if(mode==='root-close'){await tick();const button=nodes.get('root').toolbar.cancellationAction;assert.equal(button.type,'button');assert.equal(button.props.title,'');assert.equal(button.props.systemImage,'xmark');button.props.action();}
   if(mode==='late-fail'){await tick();views[0].handler({id:15,action:'navigate',value:{page:'invalid',state:{config:Core.normalizeConfig(null),settings:Core.normalizeSettings(null),expr:'2+',edited:true}}});}
   if(mode==='native-navigate'){
+   assert.deepEqual(JSON.parse(JSON.stringify(nodes.get('root').ignoresSafeArea)),{regions:'container',edges:'bottom'});
+   const settings=nodes.get('root').toolbar.primaryAction;assert.equal(settings.props.systemImage,'ellipsis.circle');assert.ok(!views[0].evaluations.some(js=>js.includes('__exchangeOpenSettings')));settings.props.action();await tick();assert.equal(views[0].evaluations.at(-1),'window.__exchangeOpenSettings()');
    const state={config:Core.normalizeConfig(null),settings:Core.normalizeSettings(null),snapshot:null,expr:'2+',edited:true};
-   await tick();views[0].handler({id:11,action:'navigate',value:{page:'detail',state}});await tick();assert.equal(views.length,2);assert.equal(nodes.get('root').toolbar,undefined);assert.equal(nodes.get('page1').toolbar,undefined);
+   await tick();views[0].handler({id:11,action:'navigate',value:{page:'detail',state}});await tick();assert.equal(views.length,2);assert.equal(nodes.get('root').toolbar,undefined);assert.equal(nodes.get('page1').toolbar,undefined);assert.equal(nodes.get('page1').ignoresSafeArea,undefined);
    views[1].handler({id:12,action:'navigate',value:{page:'selector',state:{...state,selection:{kind:'quote',back:'detail'}}}});await tick();assert.equal(views.length,3);assert.equal(nodes.get('page2').toolbar,undefined);
    const detail=[...nodes].find(([id])=>id==='page1')[1];detail.navigationDestination.onChanged(true);await tick();assert.equal(views[2].disposed,false);
    detail.navigationDestination.onChanged(false);await tick();assert.equal(views[2].disposed,true);assert.match(views[1].evaluations.at(-1),/__exchangeResume/);

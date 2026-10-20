@@ -195,7 +195,10 @@ function renderSelector() {
     for (const c of items) {
       const b = element('button', undefined, 'currency'), labels = element('span', undefined, 'labels');
       labels.append(element('span', c.name), element('small', c.code + ' · ' + c.region + (Core.NON_FIAT[c.code] ? '（非央行行情）' : '')));
-      b.append(element('span', Core.flag(c.country), 'flag'), labels, element('span', c.code === selectedCode() ? '✓' : '', 'check'));
+      const selected=c.code===selectedCode(),mark=element('span',undefined,'check');
+      b.setAttribute('aria-pressed',String(selected));mark.setAttribute('aria-hidden','true');
+      if(selected){const ns='http://www.w3.org/2000/svg',icon=document.createElementNS(ns,'svg'),path=document.createElementNS(ns,'path');icon.setAttribute('viewBox','0 0 24 24');for(const [key,value] of Object.entries({d:'M4 12l5 5L20 6',fill:'none',stroke:'currentColor','stroke-width':2,'stroke-linecap':'round','stroke-linejoin':'round'}))path.setAttribute(key,value);icon.append(path);mark.append(icon);}
+      b.append(element('span', Core.flag(c.country), 'flag'), labels, mark);
       b.disabled = selection.kind === 'row' ? config.codes.includes(c.code) && c.code !== selectedCode() : selection.kind === 'base' ? c.code === detailQuote : c.code === detailBase;
       b.onclick = () => {
         try {
@@ -320,5 +323,7 @@ function renderDecimalChoices(){
 }
 function openDecimalChoices(){show('decimalChoices');}
 $('fiatDecimals').onclick=openDecimalChoices;
-$('settings').onclick=()=>{renderSettings();show('menu');};
+function openSettings(){if(NATIVE&&(!ready||!active))return;renderSettings();show('menu');}
+window.__exchangeOpenSettings=openSettings;
+$('settings').onclick=openSettings;
 $('resetCurrencies').onclick=()=>{if(!confirm('恢复默认币种列表？将恢复 USD、CNY、CAD、EUR、GBP、AUD，并以人民币为基准。'))return;config={codes:[...Core.DEFAULT_CODES],base:'CNY',amount:settings.defaultAmount};expr=numberText(config.amount);fresh=true;edited=false;persist();render();toast('已恢复默认币种列表');};
