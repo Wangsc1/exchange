@@ -62,12 +62,12 @@ async function run(){
    loaders.set(id,load);return view
   }
   stage='检查原生导航接口'
-  for(const [key,value] of Object.entries({Navigation:Host.Navigation,NavigationStack:Host.NavigationStack,VStack:Host.VStack,WebView:Host.WebView,Text:Host.Text,useState:Host.useState}))if(value==null)throw new Error('当前Scripting缺少 '+key)
+  for(const [key,value] of Object.entries({Navigation:Host.Navigation,NavigationStack:Host.NavigationStack,VStack:Host.VStack,WebView:Host.WebView,Text:Host.Text,Button:Host.Button,useState:Host.useState}))if(value==null)throw new Error('当前Scripting缺少 '+key)
   stage='构造原生根页'
   session=new NavigationSession({create,dispose,
    pause:async c=>{await loading.get(c as WebViewController);if(alive.has(c as WebViewController))await startup('暂停原生网页',(c as WebViewController).evaluateJavaScript('window.__exchangePause()'))},
    sync:async(c,state)=>{await loading.get(c as WebViewController);if(alive.has(c as WebViewController))await startup('同步原生网页',(c as WebViewController).evaluateJavaScript(`window.__exchangeResume(${encode(state)})`))},request})
-  const {Navigation,NavigationStack,VStack,WebView,Text,useState}=Host
+  const {Navigation,NavigationStack,VStack,WebView,Text,Button,useState}=Host
   // 每个父页都持有固定Destination组件；isPresented只控制呈现，不替换content。
   function Destination({id}:{id:string|null}){
    return id?<Screen id={id}/>:<Text>正在准备页面…</Text>
@@ -79,6 +79,7 @@ async function run(){
    if(!record)return <Text>页面已关闭</Text>
    const title=record.title
    return <VStack frame={{maxWidth:'infinity',maxHeight:'infinity'}} navigationTitle={title} navigationBarTitleDisplayMode="inline"
+    toolbar={id==='root'&&!presented?{cancellationAction:<Button title="" systemImage="xmark" action={()=>dismiss?.()}/>} : undefined}
     onAppear={()=>{loaders.get(id)?.().catch(fail)}}
     navigationDestination={{isPresented:presented,onChanged:value=>{if(!value){setPresented(false);const child=session!.pages.get(id)?.child;if(child)session!.pop(child).catch(fail)}},content:<Destination id={record.child}/>}}>
     <WebView controller={record.controller as WebViewController} frame={{maxWidth:'infinity',maxHeight:'infinity'}}/>
