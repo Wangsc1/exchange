@@ -50,3 +50,8 @@ test('币种对勾状态：六行各自选中项、搜索后标记、详情基�
  a.document.querySelector('.swipe.right').click();await tick();for(const i of [0,1]){const code=i===0?'USD':'CNY';a.document.querySelectorAll('#pair button')[i].click();await tick();verify(code);await a.pop();}
  }finally{await a.close();}});
 test('原生设置桥仅点击才打开，沿用show共享未完成表达式和编辑态；返回仍可续写',async()=>{const a=await boot();try{key(a,'2');key(a,'+');assert.equal(a.page,'home');a.window.__exchangeOpenSettings();await tick();assert.equal(a.page,'menu');assert.equal(a.session.state.expr,'2+');assert.equal(a.session.state.edited,true);await a.pop();assert.equal(a.document.getElementById('expression').textContent,'2+ CNY');key(a,'3');await a.click('equals');assert.equal(a.saves.at(-1).amount,5);}finally{await a.close();}});
+
+test('设置子页保存中返回设置并关闭设置，迟到成功同步主页、切源重新请求且默认金额生效',async()=>{let finish;const saveDelay=new Promise(r=>finish=r);const a=await boot({saveDelay});try{
+ a.window.__exchangeOpenSettings();await tick();await a.click('setting-source');a.document.querySelectorAll('#choiceRows button')[Core.SOURCES.findIndex(s=>s.key==='er')].click();await tick();await a.pop();await a.pop();assert.equal(a.page,'home');finish();await tick();await tick();assert.equal(a.session.state.settings.source,'er');assert.ok(a.requests.some(r=>r.action==='latest'&&r.value==='er'));assert.match(a.document.getElementById('source').textContent,/ExchangeRate-API/);
+ a.window.__exchangeOpenSettings();await tick();await a.click('setting-defaultAmount');a.document.querySelectorAll('#choiceRows button')[3].click();await tick();await a.pop();a.document.querySelector('.rowContent').click();await tick();assert.equal(a.document.querySelector('.row.active .amount').textContent,'1000');
+ }finally{finish();await a.close();}});

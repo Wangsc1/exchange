@@ -72,9 +72,24 @@ async function run(){
   function Destination({id}:{id:string|null}){
    return id?<Screen id={id}/>:<Text>正在准备页面…</Text>
   }
-  function Screen({id}:{id:string}){
+  async function presentSettings(id:string){
+   // 独立全屏模态使用系统上下转场，不提供sheet拖拽关闭；内部仍是原生push栈。
+   function SettingsApp(){
+    const closeSettings=Navigation.useDismiss()
+    return <NavigationStack><Screen id={id} closeSettings={closeSettings}/></NavigationStack>
+   }
+   try{
+    await Navigation.present({element:<SettingsApp/>,modalPresentationStyle:'fullScreen'})
+    await session?.pop(id)
+   }catch(error){fail(error)}
+  }
+  function Screen({id,closeSettings}:{id:string;closeSettings?:()=>void}){
    const [presented,setPresented]=useState(false)
-   session!.bind(id,setPresented)
+   session!.bind(id,value=>{
+    setPresented(value)
+    const child=session!.pages.get(id)?.child
+    if(value&&id==='root'&&child&&session!.pages.get(child)?.page==='menu')void presentSettings(child)
+   })
    const record=session!.pages.get(id)
    if(!record)return <Text>页面已关闭</Text>
    const title=record.title
@@ -87,9 +102,9 @@ async function run(){
       const view=record.controller as WebViewController
       loading.get(view)?.then(()=>{if(alive.has(view)&&session?.isActive(id))return view.evaluateJavaScript('window.__exchangeOpenSettings()')}).catch(fail)
      }}/>
-    } : undefined}
+    } : closeSettings&&!presented?{topBarLeading:<Button title="" systemImage="chevron.left" action={closeSettings}/>} : undefined}
     onAppear={()=>{loaders.get(id)?.().catch(fail)}}
-    navigationDestination={{isPresented:presented,onChanged:value=>{if(!value){setPresented(false);const child=session!.pages.get(id)?.child;if(child)session!.pop(child).catch(fail)}},content:<Destination id={record.child}/>}}>
+    navigationDestination={{isPresented:presented&&session!.pages.get(record.child||'')?.page!=='menu',onChanged:value=>{if(!value){const child=session!.pages.get(id)?.child;if(child&&session!.pages.get(child)?.page==='menu')return;setPresented(false);if(child)session!.pop(child).catch(fail)}},content:<Destination id={record.child}/>}}>
     <WebView controller={record.controller as WebViewController} frame={{maxWidth:'infinity',maxHeight:'infinity'}}/>
    </VStack>
   }
