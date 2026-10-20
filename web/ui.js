@@ -186,9 +186,11 @@ function renderSelector() {
   const letters = [];
   if (!searching) {
     letters.push({ key: 'common', label: '#' });
+    const buckets=new Map();
+    for(const c of found){const L=letterOf(c);if(!buckets.has(L))buckets.set(L,[]);buckets.get(L).push(c);}
     for (const L of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') {
-      const items = found.filter(c => letterOf(c) === L).sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-u-co-pinyin'));
-      if (items.length) { groups.push([L, items, L]); letters.push({ key: L, label: L }); }
+      const items = buckets.get(L);
+      if (items?.length) { items.sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-u-co-pinyin')); groups.push([L, items, L]); letters.push({ key: L, label: L }); }
     }
   }
   renderLetterIndex(letters);

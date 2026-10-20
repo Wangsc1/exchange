@@ -162,7 +162,7 @@ exports.CURRENCIES = [
 exports.NON_FIAT = { BTC: '₿', ETH: 'Ξ', USDT: '₮', USDC: '$', BNB: '◆', SOL: '◎', XRP: '✕', DOGE: 'Ð', XAU: '🥇', XAG: '🥈', XPT: '⬜', XPD: '⬜' };
 function flag(country) { if (exports.NON_FIAT[country])
     return exports.NON_FIAT[country]; return [...country].map(x => String.fromCodePoint(127397 + x.charCodeAt(0))).join(''); }
-function search(query, available) { const q = query.trim().toLowerCase(); return exports.CURRENCIES.filter(c => available.includes(c.code) && `${c.code} ${c.name} ${c.region}`.toLowerCase().includes(q)); }
+function search(query, available) { const q = query.trim().toLowerCase(), codes = new Set(available); return exports.CURRENCIES.filter(c => codes.has(c.code) && `${c.code} ${c.name} ${c.region}`.toLowerCase().includes(q)); }
 function validDate(s) { if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s))
     return false; const d = new Date(s + 'T00:00:00Z'); return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === s; }
 function parseLatest(data) {
@@ -302,7 +302,7 @@ async function cached(store, key, load, validate) {
         }
     }
 }
-exports.VERSION = '1.5.7';
+exports.VERSION = '1.5.8';
 function parseYahoo(data) {
     const r = data?.chart?.result?.[0];
     const ts = r?.timestamp, close = r?.indicators?.quote?.[0]?.close;

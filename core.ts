@@ -135,7 +135,7 @@ export const CURRENCIES = [
 ].map(([code,name,region,country,symbol]) => ({code,name,region,country,symbol}))
 export const NON_FIAT:Record<string,string>={BTC:'₿',ETH:'Ξ',USDT:'₮',USDC:'$',BNB:'◆',SOL:'◎',XRP:'✕',DOGE:'Ð',XAU:'🥇',XAG:'🥈',XPT:'⬜',XPD:'⬜'}
 export function flag(country: string): string { if(NON_FIAT[country])return NON_FIAT[country]; return [...country].map(x => String.fromCodePoint(127397+x.charCodeAt(0))).join('') }
-export function search(query: string, available: string[]) { const q=query.trim().toLowerCase(); return CURRENCIES.filter(c=>available.includes(c.code)&&`${c.code} ${c.name} ${c.region}`.toLowerCase().includes(q)) }
+export function search(query: string, available: string[]) { const q=query.trim().toLowerCase(), codes=new Set(available); return CURRENCIES.filter(c=>codes.has(c.code)&&`${c.code} ${c.name} ${c.region}`.toLowerCase().includes(q)) }
 export function validDate(s: unknown): s is string { if(typeof s!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(s))return false;const d=new Date(s+'T00:00:00Z');return Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===s }
 export function parseLatest(data: unknown): Snapshot {
   if (!Array.isArray(data)||!data.length) throw new Error('数据源未返回汇率')
@@ -217,7 +217,7 @@ export async function cached<T>(store:CacheStore,key:string,load:()=>Promise<unk
   try {const value=validate(await load()); const saved=store.set(key,value); return {value,offline:false,warning:saved?'':'缓存保存失败，下次离线可能不可用'}}
   catch(e) {try{return {value:validate(store.get(key)),offline:true,warning:`连接失败，使用缓存：${e instanceof Error?e.message:'未知错误'}`}}catch{throw new Error(`无法取得数据且没有可用缓存：${e instanceof Error?e.message:'未知错误'}`)}}
 }
-export const VERSION='1.5.7'
+export const VERSION='1.5.8'
 
 // ---- 24时/7天：日内行情（Yahoo Finance 非官方图表接口），以 USD 为中间腿交叉计算 ----
 export type Point={t:number;v:number}

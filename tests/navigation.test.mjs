@@ -24,7 +24,7 @@ async function boot(options={}){
    if(action==='config')return options.config||plain(Core.normalizeConfig(null));
    if(action==='settings')return options.settings||plain(Core.normalizeSettings(null));
    if(action==='save'||action==='saveSettings'){if(options.saveDelay&&action==='saveSettings')await options.saveDelay;saves.push(plain(value));return plain(value);}
-   if(action==='latest'){if(options.delayedSource===value)await options.delay;return {value:fixture,fetchedAt:Date.now(),offline:!!options.offline,warning:options.offline?'离线缓存':''};}
+   if(action==='latest'){if(options.delayedSource===value)await options.delay;return {value:options.snapshot||fixture,fetchedAt:Date.now(),offline:!!options.offline,warning:options.offline?'离线缓存':''};}
    if(action==='intraday')return {value:[{date:'2026-01-02T00:00:00.000Z',base:value.base,quote:value.quote,rate:2},{date:'2026-01-02T12:00:00.000Z',base:value.base,quote:value.quote,rate:3}],offline:false,warning:''};
    if(action==='history')return {value:[{date:'2026-01-02',base:value.base,quote:value.quote,rate:2}],offline:false,warning:''};
    throw Error(action);
@@ -55,3 +55,17 @@ test('设置子页保存中返回设置并关闭设置，迟到成功同步主�
  a.window.__exchangeOpenSettings();await tick();await a.click('setting-source');a.document.querySelectorAll('#choiceRows button')[Core.SOURCES.findIndex(s=>s.key==='er')].click();await tick();await a.pop();await a.pop();assert.equal(a.page,'home');finish();await tick();await tick();assert.equal(a.session.state.settings.source,'er');assert.ok(a.requests.some(r=>r.action==='latest'&&r.value==='er'));assert.match(a.document.getElementById('source').textContent,/ExchangeRate-API/);
  a.window.__exchangeOpenSettings();await tick();await a.click('setting-defaultAmount');a.document.querySelectorAll('#choiceRows button')[3].click();await tick();await a.pop();a.document.querySelector('.rowContent').click();await tick();assert.equal(a.document.querySelector('.row.active .amount').textContent,'1000');
  }finally{finish();await a.close();}});
+
+test('选择列表一次分组与原26次筛选结果等价：全部币种/过滤行情/搜索及清空，顺序与字母索引保持',async()=>{
+ const source=readFileSync(root+'web/ui.js','utf8');const literal=source.match(/const INITIAL = (\{[^\n]+\});/)[1];const initial=JSON.parse(literal.replace(/([A-Z]+):/g,'"$1":').replace(/'/g,'"'));
+ const snapshots=[fixture,{date:fixture.date,rates:Object.fromEntries(Core.CURRENCIES.map(c=>[c.code,1]))}];
+ for(const snapshot of snapshots){const a=await boot({snapshot});try{a.document.querySelector('.swipe.left').click();await tick();
+ for(const query of ['',' usd ','日本','不存在','']){const input=a.document.getElementById('search');input.value=query;input.dispatchEvent(new a.window.Event('input'));
+ const found=Core.search(query,Object.keys(snapshot.rates));const searching=!!query.trim();const groups=searching?[['搜索结果',found,'search']]:[['常用',found.filter(c=>Core.DEFAULT_CODES.includes(c.code)),'common']];
+ if(!searching)for(const L of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'){const items=found.filter(c=>(initial[c.code]||'#')===L).sort((x,y)=>x.name.localeCompare(y.name,'zh-Hans-u-co-pinyin'));if(items.length)groups.push([L,items,L]);}
+ const expected=[];for(const [title,items,key] of groups){expected.push(['group',title,key]);for(const c of items)expected.push(['currency',c.code]);}
+ const actual=[...a.document.getElementById('currencyList').children].filter(e=>e.matches('.groupTitle,.currency')).map(e=>e.matches('.groupTitle')?['group',e.textContent,e.dataset.key]:['currency',e.querySelector('small').textContent.split(' · ')[0]]);
+ assert.deepEqual(actual,plain(expected));assert.deepEqual([...a.document.querySelectorAll('#letterIndex .letter')].map(e=>e.textContent),searching?[]:['#',...groups.slice(1).map(g=>g[0])]);
+ }
+ }finally{await a.close();}}
+});
