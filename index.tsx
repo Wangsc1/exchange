@@ -80,7 +80,8 @@ async function run(){
    const title=record.title
    return <VStack frame={{maxWidth:'infinity',maxHeight:'infinity'}} navigationTitle={title} navigationBarTitleDisplayMode="inline"
     ignoresSafeArea={id==='root'?{regions:'container',edges:'bottom'}:undefined}
-    toolbar={id==='root'&&!presented?{
+    // 根页工具栏持续归属根页，由系统随导航转场切换；不随isPresented提前拆装。
+    toolbar={id==='root'?{
      cancellationAction:<Button title="" systemImage="xmark" action={()=>dismiss?.()}/>,
      primaryAction:<Button title="" systemImage="ellipsis.circle" action={()=>{
       if(!session?.isActive(id))return
