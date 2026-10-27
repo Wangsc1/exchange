@@ -11,7 +11,7 @@ export type NavigationAdapter={
 const PAGES=['home','detail','selector','menu','choices','decimalSettings','decimalChoices']
 export class NavigationSession {
  readonly pages=new Map<string,PageRecord>()
- activeId='root';state:PageState|null=null;private sequence=0;private closed=false
+ activeId='root';state:PageState|null=null;private sequence=0;private closed=false;private navigating=new Set<string>()
  constructor(private adapter:NavigationAdapter){this.add('root','home',null,null)}
  private add(id:string,page:string,parent:string|null,state:PageState|null){
   const title=page==='selector'?(state?.selection?.kind==='base'?'选择基准币种':state?.selection?.kind==='quote'?'选择目标币种':'切换货币'):page==='choices'?(state?.choiceTitle||'选项'):({home:'汇率',detail:'汇率详情',menu:'换算设置',decimalSettings:'小数点设置',decimalChoices:'法定货币'} as Record<string,string>)[page]
@@ -32,10 +32,16 @@ export class NavigationSession {
    if(value.back){await this.pop(id);return true}
    if(!PAGES.includes(value.page)||value.page==='home')throw new Error('无效页面')
    const parent=this.pages.get(id)!;if(parent.child)throw new Error('页面正在切换')
-   await this.adapter.pause(parent.controller)
-   const child=this.add('page'+(++this.sequence),value.page,id,this.state)
-   parent.child=child.id;this.activeId=child.id;parent.present(true)
-   return true
+   if(this.navigating.has(id))return true
+   this.navigating.add(id)
+   try{
+    await this.adapter.pause(parent.controller)
+    // pause跨异步边界；等待期间系统可能已pop或整窗关闭。
+    if(!this.isActive(id)||this.pages.get(id)!==parent||parent.child)return true
+    const child=this.add('page'+(++this.sequence),value.page,id,this.state)
+    parent.child=child.id;this.activeId=child.id;parent.present(true)
+    return true
+   }finally{this.navigating.delete(id)}
   }
   const result=await this.adapter.request(action,value)
   // 保存完成时，即使发起页刚被系统pop，也要把真实成功值带回当前页。
