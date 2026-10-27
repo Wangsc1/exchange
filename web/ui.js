@@ -271,7 +271,7 @@ async function start(){
  page=BOOT.page||'home';
  if(BOOT.state){applyState(BOOT.state);ready=true;mount();if(page==='detail'&&(!snapshot||needsRefresh)){needsRefresh=false;await refresh();if(snapshot)renderDetail();}return;}
  mount();
- try{config=Core.normalizeConfig(await bridge('config'));settings=Core.normalizeSettings(await bridge('settings'));expr=numberText(config.amount);ready=true;mount();}catch(e){ready=true;toast(e.message);}
+ try{config=Core.normalizeConfig(await bridge('config'));settings=Core.normalizeSettings(await bridge('settings'));config.amount=settings.defaultAmount;expr=numberText(config.amount);ready=true;mount();}catch(e){ready=true;toast(e.message);}
  await refresh();
 }
 start();

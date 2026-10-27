@@ -76,3 +76,8 @@ test('设置pause等待中系统pop，不再创建孤儿子页；重复navigate�
  const pending=session.handle(menu,'navigate',{page:'choices',state:{expr:'2+'}});await session.pop(menu);resume();await pending;assert.equal(session.activeId,'root');assert.equal(session.pages.size,1);assert.deepEqual(created,['root',menu]);assert.deepEqual(disposed,[menu]);
  const first=session.handle('root','navigate',{page:'menu',state:{}});await session.handle('root','navigate',{page:'menu',state:{}});resume();await first;assert.equal(created.length,3);assert.equal(session.pages.size,2);session.dispose();
 });
+
+test('设置货币默认值后从设置逐级返回，主页基准金额无需再点击即为新默认值',async()=>{const a=await boot();try{
+ a.window.__exchangeOpenSettings();await tick();await a.click('setting-defaultAmount');a.document.querySelectorAll('#choiceRows button')[3].click();await tick();assert.equal(a.page,'menu');await a.pop();assert.equal(a.page,'home');
+ assert.equal(a.document.querySelector('.row.active .amount').textContent,'1000');assert.equal(a.saves.filter(v=>v.codes).at(-1).amount,1000);assert.equal(a.session.state.config.amount,1000);assert.equal(a.session.state.expr,'1000');
+}finally{await a.close();}});
